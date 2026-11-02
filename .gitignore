@@ -4,3 +4,4 @@ __pycache__/
 *.pkl
 *.o
 .DS_Store
+.local-deps/

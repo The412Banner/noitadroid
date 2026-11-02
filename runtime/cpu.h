@@ -29,7 +29,9 @@ typedef struct CPU {
 // a constant: as a global pointer, every guest store (char/may_alias, so it may alias the pointer) forced a reload.
 // The base is one 16 KB page off a round number on purpose: with the low 32 bits zero, clang builds each address with
 // an ORR immediate plus a separate access, instead of keeping the base in a register for [base, w, uxtw] (9% less code).
+#ifndef MEM_HOST_BASE  // runtime/compat/compat.h sets a lower one for Linux and Android
 #define MEM_HOST_BASE 0x200000004000ull
+#endif
 #define MEM ((uint8_t *)MEM_HOST_BASE)
 
 typedef uint32_t __attribute__((aligned(1), may_alias)) u32u;
