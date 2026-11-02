@@ -13,90 +13,48 @@
 
 其他设备暂未测试，欢迎反馈。
 
-> 这个仓库不含任何游戏代码和资源，所以没有现成的 APK 可下载。你需要用**自己在 GOG 上买的 Noita** 自己构建。构建出的应用里有由你的游戏转换而来的代码，还有 FMOD 的库：只装在自己的设备上，**不要分享 APK**。
+> **APK 里不含任何游戏代码。** 你需要**自己在 GOG 上买的 Noita**。App 会在你的设备上，用这份游戏生成游戏的原生代码，大约 15 分钟，只需一次。这些代码是由游戏转换来的，只留在你自己的设备上，不要分享。整个过程不下载也不上传任何东西。
+
+## 安装
+
+需要准备：
+- **GOG 上的 Windows 版 Noita**，版本 `20250125-1640`（2025 年 1 月 25 日）的离线安装包 `setup_noita_20250125-1640_(79502).exe`（一个 1.5 GB 的文件）。Steam 版不行，因为重编译出来的代码只对应这一个版本。
+- **一台 Android 设备：**
+  - arm64，Android 10 或更新，支持 OpenGL ES 3.0；
+  - 构建时很吃内存，建议 8 GB 或以上（实测用的是 16 GB）；
+  - 安装期间大约需要 5 GB 空闲空间，装好后占 2 GB；
+  - 推荐用手柄。
+- **可选，用于声音：** Android 版 FMOD Engine **2.01.x**。要在 [fmod.com](https://www.fmod.com/download) 注册免费账号后自己下载，因为它的许可证不允许 App 自带。没有它游戏也能玩，只是没有声音。
+
+步骤：
+1. **安装 APK**：从 [Releases](https://github.com/zhouwuqi/noitadroid/releases/latest) 下载。
+2. **把 GOG 安装包放到设备上**，放在「下载」（Download）文件夹，或者存储卡的根目录。如果你想直接拷已经安装好的 Noita 文件夹（有 `noita.exe` 的那个），可以拷到「内部存储/noitadroid/Noita」；放在别处也行，在 App 里选中它的 `noita.exe` 即可。
+3. **打开「Noita (noitadroid)」**，首屏会列出还缺什么：
+   1. **所有文件访问权限。** App 从共享存储读取游戏，存档也放在那里。
+   2. **从安装包安装。** App 先把安装包解包到「内部存储/noitadroid/Noita」（1–3 分钟），再构建游戏代码（骁龙 G3x Gen 2 上约 12 分钟）。期间处理器满负荷运行，设备会发热：请接上充电器，最好取下保护壳。可以切到别的 App，但不要从最近任务里关掉 Noita。构建中断的话，下次会从中断处继续。完成后 App 会提示可以删掉安装包。
+   3. **声音（可选）。** 下载 **Android 版 FMOD Engine 2.01.23**（`fmodstudioapi20123android.tar.gz`，在 fmod.com 的版本列表里选 2.01.23），放进「下载」文件夹，点「导入」。导入后 App 会自动重启。
+4. **开始游戏。** 之后打开 App 会直接进入游戏。
+
+App 更新后，如果游戏代码需要的东西变了，会提示重新构建一次。
+
+APK 的签名证书（SHA-256）：
+`1A:5E:5E:78:98:01:E1:48:15:EB:19:62:95:7B:F1:65:13:F3:97:BB:97:FF:EC:45:DC:D4:5D:8D:98:7B:51:F5`。
 
 ## 原理
 
-- **游戏本身：** mina4mac 的重编译器把 32 位 x86 的 `noita.exe`（以及 `msvcp120.dll`）转换成 C，再由 NDK 编译成 ARM64。
+- **游戏本身：** mina4mac 的重编译器把 32 位 x86 的 `noita.exe`（以及 `msvcp120.dll`）转换成 C，再由 clang 编译成 ARM64。
+- **在设备上：** App 自带一套工具链：
+  - clang 和 lld（LLVM 21）；
+  - 运行重编译器用的 Python 3.14；
+  - 解包 GOG 安装包用的 innoextract。
+
+  App 用它们在你的文件上运行重编译器，编译生成的约 400 MB C 代码，再把游戏库链接到 App 的私有目录。
 - **运行时：** 它替代游戏用到的 Windows DLL，包括 kernel32 和 C 运行库，并桥接到原生的 SDL2、LuaJIT（含 ARM64 JIT）和 FMOD。
 - **图形：** 游戏用的桌面 OpenGL 2.1 由 [gl4es](https://github.com/ptitSeb/gl4es) 转到 GLES 3.0 上运行。
 - **Android 应用：** 游戏跑在 SDL2 的 Activity 里，外面还有：
-  - 首次启动时的检查屏，告诉你还缺什么；
+  - 首屏，负责安装和构建；
   - 从左边缘滑出的游戏内菜单；
-  - 所有文件都放在共享存储里，游戏和存档可以直接通过 USB 拷贝。
-
-## 需要准备
-
-- **GOG 上的 Windows 版 Noita**，版本 `20250125-1640`（2025 年 1 月 25 日）。用它的离线安装包 `setup_noita_20250125-1640_(79502).exe`（一个 1.5 GB 的文件）。Steam 版不行，因为重编译出来的代码只对应这一个版本。
-- **一台 Android 设备：**
-  - arm64，Android 10 或更新，支持 OpenGL ES 3.0；
-  - 约 2 GB 空闲空间；
-  - 推荐用手柄。
-- **一台用来构建的 Linux x86_64 电脑。** 以下步骤在 Ubuntu 24.04 上验证过，12 核大约 15 分钟构建完。
-- **可选，用于声音：** Android 版 FMOD Engine **2.01.x**。要在 [fmod.com](https://www.fmod.com/download) 注册免费账号后自己下载，因为它的许可证不允许分享。没有它游戏也能玩，只是没有声音。
-
-## 构建
-
-### 1. 工具
-
-```sh
-sudo apt install git clang lld cmake ninja-build make innoextract openjdk-17-jdk libsdl2-dev libgles-dev libegl-dev
-curl -LsSf https://astral.sh/uv/install.sh | sh        # 构建脚本用 uv 运行
-```
-
-用 Android Studio 或命令行工具安装 Android SDK，需要这些组件：
-
-```sh
-sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865"
-```
-
-### 2. 获取仓库
-
-```sh
-git clone --recursive https://github.com/zhouwuqi/noitadroid
-cd noitadroid
-mkdir -p .local-deps
-ln -s "$ANDROID_HOME/ndk/29.0.14206865" .local-deps/ndk
-echo "sdk.dir=$ANDROID_HOME" > android/local.properties
-tools/android/deps.sh                                    # 把 gl4es 和 SDL2 构建到 .local-deps
-```
-
-### 3. 游戏文件
-
-```sh
-innoextract --gog -d .local-deps/noita-gog "setup_noita_20250125-1640_(79502).exe"
-export NOITA_DIR=$PWD/.local-deps/noita-gog
-```
-
-### 4. 声音（可选，推荐）
-
-在 fmod.com/download 下载 **FMOD Engine 2.01.23 的 Android 版**（`fmodstudioapi20123android.tar.gz`）。2.01.23 是旧版本，要在版本列表里选。然后运行：
-
-```sh
-tools/android/setup_fmod.sh path/to/fmodstudioapi20123android.tar.gz
-```
-
-不带参数时，脚本会去 `~/Downloads` 里找；找不到就在终端里询问你的 fmod.com 账号，自己下载。不是 2.01.x 的版本会被拒绝。
-
-### 5. 构建应用
-
-```sh
-for m in noita msvcp120; do uv run tools/discover.py $m; done   # 只需一次
-uv run tools/build_all.py                 # 把游戏重编译成 C（同时构建 Linux 版）
-uv run tools/android/build_game.py        # 生成 APK：build/android/noitadroid.apk
-```
-
-### 6. 安装并拷贝游戏
-
-```sh
-adb install -r build/android/noitadroid.apk
-```
-
-在设备上打开 **Noita (noitadroid)**。首屏会列出还缺什么，以及每一项该怎么做：
-1. **所有文件访问权限。** 应用从 `/sdcard/noitadroid` 读取游戏，存档也放在那里。
-2. **游戏文件。** 把你的 Noita 文件夹（有 `noita.exe` 的那个）里的所有内容拷到「内部存储/noitadroid/Noita」。可以用 USB 拷，也可以用 adb 运行 `tools/android/push_game.sh`，约 1.5 GB。
-
-全部就绪后，打开应用会直接进入游戏。
+  - 游戏和存档都放在共享存储里，可以直接通过 USB 拷贝。
 
 ## 游玩
 
@@ -109,20 +67,22 @@ adb install -r build/android/noitadroid.apk
 - **设备上的文件：**
   - `/sdcard/noitadroid/Noita/`：游戏。
   - `/sdcard/noitadroid/save/AppData/LocalLow/Nolla_Games_Noita/`：存档，卸载应用后也会保留。
-  - `/sdcard/noitadroid/noitadroid.log`：日志，也可以用 `adb logcat -s noitadroid` 查看。
+  - `/sdcard/noitadroid/noitadroid.log`：游戏日志，也可以用 `adb logcat -s noitadroid` 查看。
+  - `/sdcard/noitadroid/build.log`：最近一次构建的日志。
 
 ## 故障排查
 
-- **首屏说版本不对：** 你的 `noita.exe` 不是 GOG 的 20250125-1640 版，或者不是构建这个应用时用的那一份。
-- **没有声音：** 应用构建时没加入 FMOD（首屏会提示），或者用的不是 2.01.x。
+- **构建失败：** 首屏会显示原因，详细信息在 `/sdcard/noitadroid/build.log`。如果是内存不够，关掉其他应用再构建一次，会从中断处继续。
+- **首屏说版本不对：** 你的 `noita.exe` 不是 GOG 的 20250125-1640 版。
+- **没有声音：** 按上面的步骤导入 Android 版 FMOD 2.01.x，其他版本会被拒绝。
 - **手柄有问题：** 在 `/sdcard/noitadroid/` 下放一个名为 `debug_input` 的空文件，日志里就会列出手柄和它们的轴。
-- 其他问题：看 `/sdcard/noitadroid/noitadroid.log`，然后提 issue。
+- 其他问题：先看日志，再提 issue。
 
 ## 常见问题（FAQ）
 
-### 有现成的 APK 可以下载吗？
+### APK 里有游戏吗？
 
-没有，以后也不会有。APK 里有由 Noita 本身转换来的代码和 FMOD 的库，这些都不能分享。每个人都要用自己的游戏自己构建。请不要索要或分享 APK。
+没有。APK 里只有重编译器、编译器和运行时，没有任何来自 Noita 的东西，也没有 FMOD。游戏代码是在你的设备上用你自己的游戏生成的，每个人都要自己构建。请不要分享 App 构建出的游戏代码（它放在 App 的私有目录里），也不要分享含有游戏代码的 APK。
 
 ### Steam 版能用吗？
 
@@ -130,7 +90,11 @@ adb install -r build/android/noitadroid.apk
 
 ### 我的手机或掌机能跑吗？
 
-只要是 arm64、Android 10 或更新、支持 OpenGL ES 3.0，大概率可以，但目前只在 AYANEO Pocket S 上测过。Noita 很吃 CPU，较新的骁龙芯片会更好。欢迎提 issue 反馈运行情况。
+只要是 arm64、Android 10 或更新、支持 OpenGL ES 3.0、内存够构建用，大概率可以，但目前只在 AYANEO Pocket S 上测过。Noita 很吃 CPU，较新的骁龙芯片会更好。欢迎提 issue 反馈运行情况。
+
+### 构建为什么要这么久？
+
+重编译器会生成大约 400 MB 的 C 代码，设备要用自己的编译器把它们全部编译一遍。在骁龙 G3x Gen 2 上大约 12 分钟，只需一次。
 
 ### 能用 mod 吗？
 
@@ -144,17 +108,62 @@ adb install -r build/android/noitadroid.apk
 
 这样游戏和存档才能放在共享存储里：可以通过 USB 拷贝，重装应用也不会丢。
 
-## 开发
+## 从源码构建
 
-- [docs/ANDROID.zh.md](docs/ANDROID.zh.md)：移植的开发笔记，包括设计、各个阶段和设备测试。
+在 Linux x86_64 电脑上（Ubuntu 24.04 上验证过）：
+
+```sh
+sudo apt install git clang lld cmake ninja-build make innoextract openjdk-17-jdk libsdl2-dev libgles-dev libegl-dev
+curl -LsSf https://astral.sh/uv/install.sh | sh        # 构建脚本用 uv 运行
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865"
+
+git clone --recursive https://github.com/zhouwuqi/noitadroid
+cd noitadroid
+mkdir -p .local-deps
+ln -s "$ANDROID_HOME/ndk/29.0.14206865" .local-deps/ndk
+echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+tools/android/deps.sh                         # 把 Android 版 gl4es 和 SDL2 构建到 .local-deps
+```
+
+**APK**（不需要游戏）：
+
+```sh
+uv run tools/android/build_toolchain.py       # 设备上用的工具链：LLVM 大约要一小时、10 GB 空间
+uv run tools/android/build_app.py --release   # 生成 build/android-app/noitadroid-<版本>.apk
+```
+
+如果有 `.local-deps/keys/release.properties`，release 版用里面指定的密钥签名，否则用 debug 密钥。
+
+**内含游戏代码的开发版**：在电脑上用你自己的游戏构建，只装在自己的设备上：
+
+```sh
+innoextract --gog -d .local-deps/noita-gog "setup_noita_20250125-1640_(79502).exe"
+export NOITA_DIR=$PWD/.local-deps/noita-gog
+tools/android/setup_fmod.sh path/to/fmodstudioapi20123android.tar.gz   # 可选：声音
+for m in noita msvcp120; do uv run tools/discover.py $m; done   # 只需一次
+uv run tools/build_all.py                     # 把游戏重编译成 C（同时构建 Linux 版）
+uv run tools/android/build_game.py            # 生成 build/android/noitadroid.apk，不要分享
+```
+
+更多：
+- [docs/ANDROID.zh.md](docs/ANDROID.zh.md)：移植的开发笔记，包括设计、设备上的构建和设备测试。
 - [docs/README.mina4mac.md](docs/README.mina4mac.md)：mina4mac 原来的 README，介绍重编译器和 macOS 版的构建。
 - 运行时的测试也能在设备上跑：先运行 `tools/android/build_tests.sh`，再运行 `tools/android/device_check.sh`。
 
 ## 致谢与许可
 
 - **mina4mac**：Paul Straw 编写，本移植所基于的重编译器和运行时，MIT 许可。
-- **随附的代码**沿用各自的许可：[LuaJIT](https://luajit.org)（MIT）、[gl4es](https://github.com/ptitSeb/gl4es)（MIT）、[SDL2](https://libsdl.org)（zlib）。
+- **App 里附带的组件**沿用各自的许可，许可证全文在 APK 里（`assets/toolchain.zip` 的 `licenses/` 目录）：
+  - [LLVM](https://llvm.org)（clang、lld；Apache-2.0，带 LLVM 例外条款）
+  - [CPython](https://python.org)（PSF）
+  - [capstone](https://www.capstone-engine.org)（BSD）
+  - [pefile](https://github.com/erocarrera/pefile)（MIT）
+  - [innoextract](https://constexpr.org/innoextract/)（zlib），以及它用到的 [Boost](https://boost.org)（BSL-1.0）、xz（0BSD）和 bzip2
+  - Android 的 D8，以及 NDK 的 sysroot 和运行时库（Apache-2.0）
+  - [SDL2](https://libsdl.org)（zlib）
+  - [LuaJIT](https://luajit.org)（MIT）
+  - [gl4es](https://github.com/ptitSeb/gl4es)（MIT）
 - **FMOD** 遵循 FMOD 自己的许可，需要你自己下载。
-- **noitadroid 自己的代码**采用 MIT 许可，见 [LICENSE](LICENSE)。
+- **noitadroid 自己的代码**和图标采用 MIT 许可，见 [LICENSE](LICENSE)。
 
 Noita © Nolla Games。本项目与 Nolla Games、GOG、Firelight Technologies 均无关联，也未获得它们的认可。

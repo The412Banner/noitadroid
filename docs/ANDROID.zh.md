@@ -142,6 +142,55 @@ FMOD：运行 `tools/android/setup_fmod.sh`。它会先在 `~/Downloads` 和 `.l
 
 生成的 APK 里有由游戏转换而来的代码：只装在自己的设备上，不要分发。
 
+## 在设备上构建（进行中）
+
+目标和血源移植（Bloodborne-Android）一样：公开发布一个**不含任何游戏代码**的 APK。用户把自己的游戏拷到手机上，由 App 在手机上把游戏翻译、编译成 `files/game/libmain.so`。翻译出来的代码属于游戏的版权方，只留在用户自己的设备上。
+
+步骤：
+1. **工具链**（已完成）：`tools/android/build_toolchain.py`，产物在 `.local-deps/toolchain`。都不来自游戏。
+   - `libnd_llvm.so`：clang、lld 和 llvm-nm 21.1.8 合成的一个静态多合一程序，目标是 arm64 和 x86，大小 95 MB。
+   - `libnd_ld.so`：让 clang 的驱动能调用 lld 的小程序。
+   - `libnd_python.so` 和 `libpython3.14.so`：python.org 的 Android 版 CPython 3.14。
+   - `libcapstone.so`：只含 x86。
+   - `libnd_innoextract.so`：静态链接的 innoextract（1.9 之后到 2025-02 的主线版本），用户可以直接选 GOG 的离线安装包，由 App 在手机上解包。依赖的 Boost 1.92、liblzma、bzip2 都静态链接进去。
+   - assets：clang 的头文件、NDK 的 sysroot（API 29）、精简过的 Python 标准库、capstone 的 Python 绑定、pefile，以及转成 dex 的 D8。
+2. **设备上的构建流程**（已完成）：
+   - `tools/android/device_build.py` 在手机上运行：检查版本 → discover → 生成 SDL/GL 桥接 → regsum → 按块翻译 → 编译 → 链接。每一步都保留做完的部分，中断后再运行就从中断处继续。进度以 `ND-PROGRESS`、`ND-DONE`、`ND-ERROR` 行输出给 App。
+   - `tools/target.py` 在设置了 `NOITADROID_TOOLCHAIN` 时改用 App 自带的工具链。
+   - `tools/android/build_app.py` 打包公开版 APK（`build/android-app/noitadroid.apk`，Gradle 加 `-Pnoitadroid.public`），里面只有 SDL2、工具链、`kit.zip`（构建用的工具、运行时、头文件、预编译的 LuaJIT 和 gl4es）和 `toolchain.zip`，不含游戏代码和 FMOD。
+   - App 端：`BuildService`（前台服务和唤醒锁，通知里显示进度）、`NativeBuild`（路径、解压、库是否可用、进度状态）。`GameCheck` 会在「下载」、存储根目录和存储卡里自动找 GOG 安装包；首屏可以「从安装包安装」（解包加构建）或「在本机构建」。
+   - 2026-11-03 在 Pocket S 上从零实测：卸载旧 App，只把安装包放在「下载」里。整个过程约 13.5 分钟：解包不到 1 分钟，构建 785 秒。之后游戏能进，没有 FMOD 时没有声音。
+3. **界面**（大部分完成）：
+   - **导入 FMOD**（`FmodImport`、`AppFactory`）：App 在「下载」里找 `fmodstudioapi*android.tar.gz`，也可以手动选。从里面取出两个 arm64 库和 `fmod.jar`，检查版本必须是 2.01.x，用自带的 D8 把 `fmod.jar` 转成 dex，放到 `files/fmod`，然后重启 App。`AppComponentFactory` 在进程启动时让 App 的类加载器带上这份 dex，`libfmod.so` 的 `JNI_OnLoad` 就能找到 `org.fmod.*`。dex 必须设为只读（Android 14 的要求）。
+   - **选择文件**：一个文件选择器，按文件名区分 GOG 安装包（解包加构建）、`noita.exe`（把它所在的文件夹设为游戏文件夹，`--game` 参数，ABI 因此升到 2）和 FMOD 压缩包（导入）。
+   - **解包位置**：机身存储空间不够、而安装包在存储卡上时，解包到存储卡的 `noitadroid/Noita`。解包完成后可以「删除安装包」。
+   - **重启**：RestartActivity 改用 `FLAG_ACTIVITY_CLEAR_TASK`。否则新 Intent 和旧任务的根 Intent 相同时，系统只会把那个已经没有 Activity 的旧任务调到前台，什么都不启动。
+   - 2026-11-03 在 Pocket S 上实测：
+     - 导入 FMOD，2.01.23，有声音（AAudio）；
+     - 覆盖安装会杀掉正在进行的构建，再次构建时从中断处继续；
+     - 「停止」会结束所有构建进程，再次构建时从中断处继续（385 秒）。
+   - 还没实测：在系统文件选择器里选 `noita.exe` 或安装包、删除安装包。导入电脑上建好的库也还没做。
+4. **发布**：换成自己画的图标，在 GitHub Releases 发布 APK。
+
+Pocket S 上的实测（2026-11-03，从零开始，不用任何缓存）：
+
+| 步骤 | 时间 | 内存 | 说明 |
+|---|---|---|---|
+| 在 TF 卡上解包 GOG 安装包（1.5 GB） | 162 秒 | 8 MB | 822 个文件，和电脑上解包的逐字节相同 |
+| 翻译（discover、memorder、regsum、lift） | 429 秒 | 单进程峰值 5.7 GB | 6 个 fork 出来的 worker；输出和电脑上的逐字节相同（258 个文件） |
+| 编译（290 个任务，8 路并行） | 267 秒 | 单个任务最多 355 MB | CPU 最高 93 °C |
+| 链接（不开 LTO） | 0.6 秒 | 217 MB | 49 MB 的 `libmain.so` |
+
+`NoitaActivity` 在 `files/game/libmain.so` 存在时就加载它，而不是 APK 自带的 `libmain.so`。不含 `libmain.so` 的 APK 用这种方式能进游戏，也有声音。
+
+要注意的地方：
+- **多进程**：Android 的 libc 没有 `sem_open`，所以 Python 的 `multiprocessing` 不能用。翻译的驱动改成先在父进程里初始化，再自己 fork 出 worker；worker 用写时复制共享父进程的数据，只通过管道传回结果。
+- **FMOD**：`libfmod.so` 的 `JNI_OnLoad` 要找 `org.fmod.AudioDevice` 等类，不带 `fmod.jar` 时 App 直接崩溃。打算的做法：
+  - 在手机上用 D8 把用户自己的 `fmod.jar` 转成 dex（实测 1 秒）；
+  - 用 `AppComponentFactory` 让 App 的类加载器包含这份 dex，这一点还没验证。
+- **内存**：翻译时单个进程峰值 5.7 GB，8 GB 内存的手机可能不够，需要优化。
+- **adb**：`adb exec-in` 可能在设备上的 tar 写完之前就返回，推送后要先核对文件再用。
+
 ## 设备测试（不需要游戏文件）
 
 两组测试都在 4TB 盘上的工程目录里构建，`adb` 在 `/opt/android-sdk/platform-tools/`。
