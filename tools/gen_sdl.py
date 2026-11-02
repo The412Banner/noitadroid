@@ -58,13 +58,35 @@ def clang(args, src, guest):
     work.mkdir(parents=True, exist_ok=True)
     (work / "probe.c").write_text(src)
     (work / "guest_config.h").write_text(GUEST_CONFIG)
+    # Debian's SDL_config.h only includes <SDL2/_real_SDL_config.h> from the multiarch directory, which
+    # -nostdlibinc leaves out: the guest gets an empty one (GUEST_CONFIG stands in for its contents).
+    stub = work / "guest_inc/SDL2/_real_SDL_config.h"
+    stub.parent.mkdir(parents=True, exist_ok=True)
+    stub.write_text("")
     # The host side's layouts come from the target's compiler (Android: arm64); the guest's from any clang.
-    extra = [*GUEST, "-include", str(work / "guest_config.h")] if guest else []
+    extra = [*GUEST, "-include", str(work / "guest_config.h"), "-I", str(work / "guest_inc")] if guest else []
     p = subprocess.run([*(["clang"] if guest else target.cc()), *extra, "-I", sdl_include(), *args, str(work / "probe.c")],
                        capture_output=True, text=True)
     if p.returncode:
         sys.exit(f"clang failed:\n{p.stderr[:2000]}")
     return p.stdout
+
+
+def typedef_name(path, line, col):
+    """The name `typedef struct { ... } NAME;` gives the anonymous record at path:line:col (clang's record dumps
+    call it "(unnamed at ...)"; SDL2's own headers declare SDL_DisplayMode and others this way, sdl2-compat's
+    name them)."""
+    src = "\n".join(Path(path).read_text(errors="replace").splitlines()[line - 1:])[col - 1:]
+    depth = 0
+    for i, ch in enumerate(src):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                m = re.match(r"\s*(\w+)\s*;", src[i + 1:])
+                return m[1] if m else None
+    return None
 
 
 def layouts(guest):
@@ -75,6 +97,9 @@ def layouts(guest):
     for line in out.splitlines():
         if m := re.match(r"\s*0 \| (?:struct|union) (SDL_\w+)$", line):
             cur = recs[m[1]] = [0, []]
+        elif (m := re.match(r"\s*0 \| (?:struct|union) \(unnamed at (.+):(\d+):(\d+)\)$", line)) and \
+                (name := typedef_name(m[1], int(m[2]), int(m[3]))) and name.startswith("SDL_"):
+            cur = recs[name] = [0, []]
         elif cur is None:
             continue
         elif m := re.match(r"\s*(\d+)(:\S+)? \|   (?! )(.*) (\w+)$", line):

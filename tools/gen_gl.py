@@ -30,12 +30,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from glsurvey import header_names  # noqa: E402
 from pe import ROOT, game_dir  # noqa: E402
+import target  # noqa: E402
 
 GEN = ROOT / "build/gen_all"
 XML = ROOT / "third_party/khronos/gl.xml"  # KhronosGroup/OpenGL-Registry @ 1cdd228e (Apache-2.0)
 # Hand-written in runtime/opengl32.c: strings, buffer mapping, arrays of pointers, and sync deletion.
 HAND = {"glGetString", "glShaderSource", "glMapBuffer", "glUnmapBuffer", "glGetBufferPointerv", "glDeleteSync",
         "glMultiDrawElements", "glMultiDrawElementsBaseVertex"}
+if not target.APPLE:  # gl4es has these and advertises GL_ARB_map_buffer_range; macOS's legacy headers have none
+    HAND |= {"glMapBufferRange", "glFlushMappedBufferRange", "glGetStringi"}
 INT = {"GLenum", "GLint", "GLuint", "GLsizei", "GLboolean", "GLbitfield", "GLbyte", "GLubyte", "GLshort",
        "GLushort", "GLchar", "GLhalf", "GLclampx", "GLfixed"}
 WIDE = {"GLdouble": "ARG_F64", "GLclampd": "ARG_F64", "GLint64": "ARG_I64", "GLuint64": "ARG_I64"}
@@ -131,7 +134,11 @@ def generate():
     unknown = sorted(n for n in names if n not in cmds)
     if unknown:
         sys.exit(f"not in gl.xml: {unknown}")
-    bridged = sorted(names & header_names("gl.h", "glext.h"))
+    bridged = names & header_names("gl.h", "glext.h")
+    provided = target.gl_provided_names()  # off Apple: only what gl4es implements (it reports GL 2.1 and its own extensions)
+    if provided is not None:
+        bridged &= provided | HAND
+    bridged = sorted(bridged)
     out, errors = [], []
     for n in bridged:
         if n in HAND:

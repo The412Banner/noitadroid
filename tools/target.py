@@ -66,23 +66,56 @@ def order_file(path) -> list[str]:
     return [f"-Wl,-order_file,{path}"]
 
 
+# Off Apple the game's GL is gl4es (desktop GL 2.1 over GLES), on Linux as on Android, so the desktop build runs
+# the Android graphics path: runtime/gles.c makes SDL create GLES 3.0 contexts.
+def gl4es_lib() -> Path | None:
+    if APPLE:
+        return None
+    if NAME == "linux":
+        return DEPS / "build/gl4es-linux/out/libGL.a"
+    return DEPS / "build/gl4es/obj/local/arm64-v8a/libGL.a"
+
+
 def gl_header_dir() -> Path:
     """Where gl.h and glext.h are: the GL the bridge can offer is what these declare."""
     if APPLE:
         sdk = subprocess.run(["xcrun", "--show-sdk-path"], capture_output=True, text=True, check=True).stdout.strip()
         return Path(sdk) / "System/Library/Frameworks/OpenGL.framework/Headers"
-    if NAME == "linux":
-        return Path("/usr/include/GL")
     return DEPS / "src/gl4es/include/GL"
 
 
+def gl_provided_names() -> set[str] | None:
+    """The GL commands the host GL implements (gl4es's exports), or None where the headers are the answer (mac)."""
+    lib = gl4es_lib()
+    if lib is None:
+        return None
+    nm = str(NDK_BIN / "llvm-nm") if NAME == "android" else "nm"
+    out = subprocess.run([nm, "--defined-only", str(lib)], capture_output=True, text=True, check=True).stdout
+    return {line.split()[-1] for line in out.splitlines() if " T gl" in line}
+
+
+def gl_cflags() -> list[str]:
+    return [] if APPLE else [f"-I{DEPS / 'src/gl4es/include'}"]
+
+
 def gl_libs() -> list[str]:
+    """GL to link: gl4es (static) and the GLES it runs on, which also serves the bridge's sync objects."""
     if APPLE:
         return ["-framework", "OpenGL"]
-    if NAME == "linux":
-        return ["-lGL"]
-    # gl4es is static; GLES3 directly for what it lacks (sync objects, runtime/compat/OpenGL/glext.h)
-    return [str(DEPS / "build/gl4es/obj/local/arm64-v8a/libGL.a"), "-lGLESv3", "-lEGL"]
+    gles = "-lGLESv3" if NAME == "android" else "-lGLESv2"
+    return [str(gl4es_lib()), gles, "-lEGL"]
+
+
+def gl_wrap_flags() -> list[str]:
+    """Link flags that route SDL's context calls through runtime/gles.c (none on Apple)."""
+    if APPLE:
+        return []
+    return ["-Wl," + ",".join(f"--wrap={f}" for f in ("SDL_Init", "SDL_GL_SetAttribute", "SDL_GL_CreateContext"))]
+
+
+def gl_glue() -> list[str]:
+    """runtime/gles.c and its link flags, for one-line builds (tools/check.sh)."""
+    return [] if APPLE else [str(ROOT / "runtime/gles.c"), *gl_wrap_flags()]
 
 
 def sys_libs() -> list[str]:
@@ -130,6 +163,8 @@ def shell() -> str:
         f"LINKER={shlex.quote(j(linker()))}",
         f"TEST_CFLAGS={shlex.quote(j(test_cflags()))}",
         f"GL_LIBS={shlex.quote(j(gl_libs()))}",
+        f"GL_CFLAGS={shlex.quote(j(gl_cflags()))}",
+        f"GL_GLUE={shlex.quote(j(gl_glue()))}",
         f"SYS_LIBS={shlex.quote(j(sys_libs()))}",
         f"SDL_CFLAGS={shlex.quote(j(sdl_cflags()))}",
         f"SDL_LIBS={shlex.quote(j(sdl_libs()))}",

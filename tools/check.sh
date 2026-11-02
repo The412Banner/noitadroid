@@ -82,8 +82,8 @@ fi
 # envtest needs build/noita/image.bin, which difftest writes, and build/gen_all/gl_gen.c (tools/gen_gl.py via build_all).
 # The launcher's runtime files (build_all.py LAUNCHER) minus main.c.
 HLE=$(sed -nE 's/^LAUNCHER = \((.*)\).*/\1/p' tools/build_all.py | tr -d '",' | tr ' ' '\n' | grep -v '^main.c$' | sed 's|^|runtime/|')
-if $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS $RT_INC runtime/env_test.c runtime/rt.c $GL_LIBS \
-        $HLE build/gen_all/gl_gen.c $SYS_LIBS -o build/envtest >"$LOG/envtest.log" 2>&1 \
+if $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS $RT_INC $GL_CFLAGS runtime/env_test.c runtime/rt.c $GL_LIBS \
+        $HLE build/gen_all/gl_gen.c $GL_GLUE $SDL_CFLAGS $SDL_LIBS $SYS_LIBS -o build/envtest >"$LOG/envtest.log" 2>&1 \
         && build/envtest build/noita/image.bin "${NOITA_DIR:-build/game}/msvcp120.dll" >>"$LOG/envtest.log" 2>&1; then
     echo "envtest: ok $(grep -c ' ok ' "$LOG/envtest.log") checks"
 else
@@ -123,7 +123,7 @@ fi
 
 # gltest needs build/gen_all/gl_gen.c; it draws into a framebuffer object of a hidden window's GL context.
 if $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS $RT_INC $SDL_CFLAGS \
-        runtime/gl_test.c runtime/opengl32.c build/gen_all/gl_gen.c runtime/rt.c runtime/heap.c runtime/hle.c \
+        $GL_CFLAGS runtime/gl_test.c runtime/opengl32.c build/gen_all/gl_gen.c runtime/rt.c runtime/heap.c runtime/hle.c $GL_GLUE \
         $SDL_LIBS $GL_LIBS $SYS_LIBS -o build/gltest >"$LOG/gltest.log" 2>&1 && build/gltest >>"$LOG/gltest.log" 2>&1; then
     echo "gltest: ok $(grep -c ' ok ' "$LOG/gltest.log") checks"
 else

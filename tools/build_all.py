@@ -44,6 +44,7 @@ GEN = ROOT / "build/gen_all"
 LAUNCHER = ("main.c", "heap.c", "proc.c", "msvcr120.c", "msvcr120_stdio.c", "msvcr120_string.c", "kernel32.c", "kernel32_file.c", "undname.c", "msvcr120_concrt.c", "sync.c", "hle.c", "msvcr120_math.c", "shlwapi.c", "shell32.c", "galaxy.c", "wininet.c", "ws2_32.c", "user32.c", "fmod.c", "fmod_stub.c", "opengl32.c", "thread.c", "sdl2_stdlib.c", "joblog.c", "sched.c")  # runtime files only the launcher links
 SDL = ("sdl2.c",)  # runtime files of the SDL2 bridge (launcher only; compiled with the host SDL2's flags)
 LUA = ("lua51.c",)  # the LuaJIT bridge (launcher only; compiled with LUA_CFLAGS, linked with LUAJIT_LIB)
+GLES = () if target.APPLE else ("gles.c",)  # GLES contexts for gl4es (launcher only; SDL's flags, target.gl_wrap_flags)
 LUAJIT_SRC = ROOT / "third_party/luajit"
 # A copy of the submodule, built in place, so the submodule stays clean. Android's sits apart from the host's.
 LUAJIT_BUILD = ROOT / ("build/android/luajit" if target.NAME == "android" else "build/luajit")
@@ -167,10 +168,11 @@ def _cc(job):
     src, extra, opt = job
     # Chunk objects sit next to their sources; runtime objects go in GEN.
     obj = (src.parent if src.name.startswith("chunk") else GEN) / (src.stem + ".o")
-    sdl = _sdl_config("--cflags") if src.stem.startswith("sdl2") and src.stem != "sdl2_stdlib" else []
+    sdl = _sdl_config("--cflags") if (src.stem.startswith("sdl2") and src.stem != "sdl2_stdlib") or src.name in GLES else []
     lua = LUA_CFLAGS if src.name in LUA else []
     subprocess.run([*target.cc(), "-c", f"-{opt}", "-ffp-contract=off", "-fno-strict-aliasing", "-w", *sdl, *lua, *extra,
-                    *target.platform_cflags(), *target.runtime_includes(ROOT / "runtime", GEN), str(src), "-o", str(obj)],
+                    *target.platform_cflags(), *target.gl_cflags(), *target.runtime_includes(ROOT / "runtime", GEN), str(src),
+                    "-o", str(obj)],
                    check=True)
     return obj
 
@@ -247,8 +249,8 @@ def main():
               f"const int IC_TARGET_COUNT = {len(ic_fns)};"]
     (GEN / "table.c").write_text("\n".join(table))
     build_luajit()
-    launcher = [*LAUNCHER, *SDL, *LUA, "sdl2_gen.c", "gl_gen.c"]
-    srcs = chunk_srcs + [GEN / "table.c", GEN / "sdl2_gen.c", GEN / "gl_gen.c"] + [ROOT / "runtime" / n for n in ("rt.c", "harness.c", "bench.c", *LAUNCHER, *SDL, *LUA)]
+    launcher = [*LAUNCHER, *SDL, *LUA, *GLES, "sdl2_gen.c", "gl_gen.c"]
+    srcs = chunk_srcs + [GEN / "table.c", GEN / "sdl2_gen.c", GEN / "gl_gen.c"] + [ROOT / "runtime" / n for n in ("rt.c", "harness.c", "bench.c", *LAUNCHER, *SDL, *LUA, *GLES)]
     with mp.Pool(os.cpu_count()) as pool:
         objs = pool.map(_cc, [(s, pgo + lto, args.opt) for s in srcs])
     t2 = time.time()
@@ -266,7 +268,8 @@ def main():
     subprocess.run([*link, *common, str(GEN / "harness.o"), *libs, "-o", str(exe)], check=True)
     subprocess.run([*link, *common, str(GEN / "bench.o"), *libs, "-o", str(ROOT / "build/bench")], check=True)
     subprocess.run([*link, *common, *(str(GEN / (Path(n).stem + ".o")) for n in launcher),
-                    str(LUAJIT_LIB), *_sdl_config("--libs"), *target.gl_libs(), *libs, "-o", str(ROOT / "build/mina4mac")],
+                    str(LUAJIT_LIB), *_sdl_config("--libs"), *target.gl_libs(), *target.gl_wrap_flags(), *libs,
+                    "-o", str(ROOT / "build/mina4mac")],
                    check=True)
     t3 = time.time()
     src_mb = sum(s.stat().st_size for s in chunk_srcs) / 1e6

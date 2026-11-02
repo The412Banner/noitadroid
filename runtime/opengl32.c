@@ -90,6 +90,23 @@ HOST_STDCALL(opengl32, glGetString, 4) {
     ret_i32(c, cache[i]);
 }
 
+#ifndef __APPLE__
+// glGetStringi (gl4es exports it): GL_EXTENSIONS by index, copied into guest memory once per index.
+HOST_STDCALL(opengl32, glGetStringi, 8) {  // (name, index)
+    enum { MAX_EXTENSIONS = 1024 };
+    static uint32_t cache[MAX_EXTENSIONS];
+    uint32_t name = ARG(0), index = ARG(1);
+    const char *s = GL_CTX ? (const char *)glGetStringi(name, index) : NULL;
+    if (!s) return ret_i32(c, 0);
+    if (name != GL_EXTENSIONS || index >= MAX_EXTENSIONS) return ret_i32(c, guest_strdup(s));  // not expected; leaks
+    if (!__atomic_load_n(&cache[index], __ATOMIC_ACQUIRE)) {
+        uint32_t g = guest_strdup(s), zero = 0;
+        if (!__atomic_compare_exchange_n(&cache[index], &zero, g, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)) heap_free(g);
+    }
+    ret_i32(c, cache[index]);
+}
+#endif
+
 // Buffer mapping. The host's mapping is a host pointer, so the guest gets a shadow copy in the guest heap:
 // filled from the mapping unless the access is write-only, and copied back on unmap unless it's read-only.
 // Keyed by context and buffer name.
@@ -151,6 +168,43 @@ HOST_STDCALL(opengl32, glUnmapBuffer, 4) {  // (target)
     heap_free(copy.guest);
     ret_i32(c, glUnmapBuffer(target));
 }
+
+#ifndef __APPLE__
+// GL_ARB_map_buffer_range (gl4es has it): the same shadow, of the mapped range, with its access bits as the
+// glMapBuffer access glUnmapBuffer copies back by. host points at the range's first byte.
+HOST_STDCALL(opengl32, glMapBufferRange, 16) {  // (target, offset, length, access)
+    GLenum target = ARG(0);
+    GLintptr offset = (int32_t)ARG(1);
+    GLsizeiptr length = (int32_t)ARG(2);
+    GLbitfield bits = ARG(3);
+    void *host = GL_CTX && length > 0 ? glMapBufferRange(target, offset, length, bits) : NULL;
+    if (!host) return ret_i32(c, 0);
+    uint32_t g = heap_alloc((uint32_t)length);
+    if (!g) { glUnmapBuffer(target); return ret_i32(c, 0); }
+    int rd = bits & GL_MAP_READ_BIT, wr = bits & GL_MAP_WRITE_BIT;
+    if (rd) memcpy(P(g), host, (size_t)length);
+    pthread_mutex_lock(&MAPS_LOCK);
+    struct Map *m = find_map(target, 1);
+    m->access = rd && wr ? GL_READ_WRITE : wr ? GL_WRITE_ONLY : GL_READ_ONLY;
+    m->host = host, m->guest = g, m->size = (uint32_t)length;
+    pthread_mutex_unlock(&MAPS_LOCK);
+    ret_i32(c, g);
+}
+
+// (target, offset, length), relative to the mapped range: the shadow's bytes go to the mapping before the flush.
+HOST_STDCALL(opengl32, glFlushMappedBufferRange, 12) {
+    GLenum target = ARG(0);
+    GLintptr offset = (int32_t)ARG(1);
+    GLsizeiptr length = (int32_t)ARG(2);
+    if (!GL_CTX) return;
+    pthread_mutex_lock(&MAPS_LOCK);
+    struct Map *m = find_map(target, 0);
+    if (m && m->host && offset >= 0 && length >= 0 && (uint64_t)offset + (uint64_t)length <= m->size)
+        memcpy((uint8_t *)m->host + offset, P(m->guest + (uint32_t)offset), (size_t)length);
+    pthread_mutex_unlock(&MAPS_LOCK);
+    glFlushMappedBufferRange(target, offset, length);
+}
+#endif
 
 HOST_STDCALL(opengl32, glGetBufferPointerv, 12) {  // (target, pname, params): GL_BUFFER_MAP_POINTER is the shadow
     if (!GL_CTX || !ARG(2)) return;

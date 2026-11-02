@@ -29,11 +29,24 @@ APK
 | 阶段 | 内容 | 需要游戏文件 | 状态 |
 |---|---|---|---|
 | 0 | 平台兼容层 `runtime/compat/` | 否 | 完成（2026-11-02） |
-| 1 | Linux 宿主构建（x86_64，在开发机上）：`build_all.py` 按目标切换编译器和链接参数；`gen_gl`/`gen_sdl` 改为对着 Linux 头文件生成；用 Xvfb + Mesa 跑通，再做 GL 调用调查（`tools/glsurvey.py`） | 是 | 构建配置已完成（`tools/target.py`），hosttest 和 luatest 在 Linux 上通过；等游戏文件 |
+| 1 | Linux 宿主构建（x86_64，在开发机上）：`build_all.py` 按目标切换编译器和链接参数；`gen_gl`/`gen_sdl` 改为对着 Linux 头文件生成；用 Xvfb + Mesa 跑通，再做 GL 调用调查（`tools/glsurvey.py`） | 是 | **能玩**（2026-11-02）：重编译 100,129 个函数，主菜单和开新局都正常，gl4es 在 llvmpipe 上约 36 fps；待查：`GL_PIXEL_PACK_BUFFER` |
 | 2 | Android 构建：NDK、SDL2 Android、gl4es（加 GLES3 同步对象）、FMOD Android、路径和已知文件夹、Gradle 打包 APK | 是 | 依赖（`tools/android/deps.sh`）、Gradle 工程（`android/`）和冒烟测试 APK 已完成，等真机结果 |
 | 3 | Pocket S 调优：主线程和工作线程放到大核（X3 + A715）上（`sched.c`）、温控、帧率上限、手柄、分辨率 | 是 | 未开始 |
 
 第 1 阶段是为了降低风险：开发机上就能把整个游戏跑起来调试，不依赖真机，并在那里先拿到 Noita 实际用到的 GL 调用和着色器清单，再决定 Android 上用 gl4es 还是 Zink。
+
+## 图形路径：Linux 和 Android 都用 gl4es
+
+游戏要的是桌面 OpenGL（2.1 兼容模式），而且它的 GL 加载器按 `GL_VERSION` 来决定用哪些函数。所以驱动报告的版本、扩展列表和桥接的函数这三者必须一致。
+
+在 macOS 上，这三者由系统的 legacy 2.1 上下文和它的头文件保证。在 Linux 和 Android 上，游戏用的 GL 是 **gl4es**（在 GLES 上提供桌面 GL 2.1，报告的也是它自己的 2.1 和扩展列表）：
+
+- `runtime/gles.c` 通过链接时的 `-Wl,--wrap` 接管 `SDL_Init`、`SDL_GL_SetAttribute` 和 `SDL_GL_CreateContext`。不管游戏要求哪种桌面 GL 上下文，实际创建的都是 GLES 3.0 上下文（X11 上走 EGL，不走 GLX），然后初始化 gl4es。
+- `tools/gen_gl.py` 只桥接 gl4es 真正实现的函数（`target.gl_provided_names()`，取自 libGL.a 的符号表）：1,044 个名字里桥接了 616 个，其中 605 个自动生成、11 个手写。
+- 另外手写了 3 个函数（`runtime/opengl32.c`，仅非 Apple 平台）：`glMapBufferRange` 和 `glFlushMappedBufferRange`（gl4es 宣称支持 `GL_ARB_map_buffer_range`；和 `glMapBuffer` 一样在来宾堆里放一份影子拷贝），以及 `glGetStringi`。
+- Linux 和 Android 的 gl4es 是同一个提交编出来的，导出的 GL 函数完全相同（1,244 个）。所以桌面开发版跑的就是 Android 的图形路径。
+
+在开发机上，`tools/run_linux.sh` 会起一个不带 GLX 的 Xvfb，并强制使用 Mesa 的 EGL（llvmpipe，GLES 3.2）。NVIDIA 的 EGL 需要真正的 NVIDIA X 屏幕，在 Xvfb 上会崩。
 
 ## 第 0 阶段做了什么
 
@@ -63,6 +76,24 @@ NDK=$ANDROID_HOME/ndk/29.0.14206865
 COMPAT="-include runtime/compat/compat.h -I runtime/compat -iquote runtime -I third_party/luajit/src"
 $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=aarch64-linux-android29 -fsyntax-only $COMPAT runtime/heap.c
 ```
+
+## Linux 开发版
+
+```sh
+export NOITA_DIR=$PWD/.local-deps/noita-gog          # innoextract --gog 解包出来的 GOG 安装目录
+for m in noita msvcp120; do uv run tools/discover.py $m; done   # 只需一次
+uv run tools/build_all.py                             # 12 核约 9 分钟：regsum 188 s，重编译 39 s，编译 80 s，ThinLTO 链接 208 s
+MINA4MAC_FPS=1 tools/run_linux.sh                     # 存档在 ~/.local/share/noitadroid
+MINA4MAC_CLICKS="15:639,350;20:445,250" tools/run_linux.sh --shot build/s.png 90   # 脚本点击开新局，90 秒时截图
+```
+
+第一次跑（2026-11-02，Xvfb + llvmpipe）：
+- 会先弹出更新日志，点「Ok」（85,662）关掉；之后主菜单和开新局都正常。
+- 生成世界时有一帧长约 65 秒。
+- 进入游戏后 34–37 fps（1280×720）。
+- gl4es 偶尔报 `unhandled Buffer type GL_PIXEL_PACK_BUFFER`：游戏的 PBO 读回 gl4es 不支持，需要查清楚游戏用它做什么。
+
+`tools/gen_sdl.py`：SDL2 自带的头文件用匿名的 `typedef struct {…} SDL_DisplayMode;`，clang 的布局转储会写成 `(unnamed at …)`。所以要回到源码里取 typedef 的名字。macOS 上用的 sdl2-compat 头文件里这些结构体是有名字的。
 
 ## 设备测试（不需要游戏文件）
 
