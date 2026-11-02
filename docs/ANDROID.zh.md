@@ -30,7 +30,7 @@ APK
 |---|---|---|---|
 | 0 | 平台兼容层 `runtime/compat/` | 否 | 完成（2026-11-02） |
 | 1 | Linux 宿主构建（x86_64，在开发机上）：`build_all.py` 按目标切换编译器和链接参数；`gen_gl`/`gen_sdl` 改为对着 Linux 头文件生成；用 Xvfb + Mesa 跑通，再做 GL 调用调查（`tools/glsurvey.py`） | 是 | **能玩**（2026-11-02）：重编译 100,129 个函数，主菜单和开新局都正常，gl4es 在 llvmpipe 上约 36 fps；待查：`GL_PIXEL_PACK_BUFFER` |
-| 2 | Android 构建：NDK、SDL2 Android、gl4es（加 GLES3 同步对象）、FMOD Android、路径和已知文件夹、Gradle 打包 APK | 是 | 依赖（`tools/android/deps.sh`）、Gradle 工程（`android/`）和冒烟测试 APK 已完成，等真机结果 |
+| 2 | Android 构建：NDK、SDL2 Android、gl4es（加 GLES3 同步对象）、FMOD Android、路径和已知文件夹、Gradle 打包 APK | 是 | **APK 已构建**（`tools/android/build_game.py`，libmain.so 72 MB）；还没在真机上跑；缺 FMOD（静音） |
 | 3 | Pocket S 调优：主线程和工作线程放到大核（X3 + A715）上（`sched.c`）、温控、帧率上限、手柄、分辨率 | 是 | 未开始 |
 
 第 1 阶段是为了降低风险：开发机上就能把整个游戏跑起来调试，不依赖真机，并在那里先拿到 Noita 实际用到的 GL 调用和着色器清单，再决定 Android 上用 gl4es 还是 Zink。
@@ -94,6 +94,28 @@ MINA4MAC_CLICKS="15:639,350;20:445,250" tools/run_linux.sh --shot build/s.png 90
 - gl4es 偶尔报 `unhandled Buffer type GL_PIXEL_PACK_BUFFER`：游戏的 PBO 读回 gl4es 不支持，需要查清楚游戏用它做什么。
 
 `tools/gen_sdl.py`：SDL2 自带的头文件用匿名的 `typedef struct {…} SDL_DisplayMode;`，clang 的布局转储会写成 `(unnamed at …)`。所以要回到源码里取 typedef 的名字。macOS 上用的 sdl2-compat 头文件里这些结构体是有名字的。
+
+## Android 游戏版
+
+```sh
+export NOITA_DIR=$PWD/.local-deps/noita-gog
+uv run tools/build_all.py                    # 先做宿主构建：重编译出来的 C 两边通用
+uv run tools/android/build_game.py           # 约 5 分钟：桥按 Android 重新生成，NDK 编译，ThinLTO 链接成 libmain.so，打 APK
+adb install -r build/android/noitadroid.apk
+tools/android/push_game.sh                   # 约 1.5 GB：noita.exe、msvcp120.dll、data/、mods/ 等
+adb logcat -s noitadroid                     # 也会写到 /sdcard/Android/data/io.github.zhouwuqi.noitadroid/files/noitadroid.log
+```
+
+设备上的目录都在 `/sdcard/Android/data/io.github.zhouwuqi.noitadroid/files/` 下：
+- `Noita/`：游戏文件；
+- `save/`：存档，在 `AppData/LocalLow/Nolla_Games_Noita` 里；
+- `noitadroid.log`：运行时日志。
+
+入口是 `runtime/android_main.c`，`runtime/main.c` 编译时改名成 `noitadroid_main`。`libmain.so` 只导出 `SDL_main`。
+
+FMOD：从 fmod.com 下载 FMOD Engine 2.01.x 的 Android 包，把包里的内容解压到 `.local-deps/fmod/`，使 `api/core/lib/arm64-v8a/libfmod.so`、`api/studio/lib/arm64-v8a/libfmodstudio.so` 和 `api/core/lib/fmod.jar` 都在对应位置。之后 `build_game.py` 会把它们打进 APK。没有 FMOD 时游戏静音运行。
+
+生成的 APK 里有由游戏转换而来的代码：只装在自己的设备上，不要分发。
 
 ## 设备测试（不需要游戏文件）
 

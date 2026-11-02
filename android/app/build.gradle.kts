@@ -40,7 +40,7 @@ android {
     }
 
     packaging {
-        jniLibs.useLegacyPackaging = false
+        jniLibs.useLegacyPackaging = true  // extracted: runtime/fmod.c opens FMOD's libraries by path
     }
 }
 

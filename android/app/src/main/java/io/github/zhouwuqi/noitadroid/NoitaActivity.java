@@ -32,4 +32,10 @@ public class NoitaActivity extends SDLActivity {
     protected String[] getLibraries() {
         return new String[] {"SDL2", "main"};
     }
+
+    /** runtime/android_main.c takes "--fmod-dir": FMOD's libraries, when the APK has them, are extracted there. */
+    @Override
+    protected String[] getArguments() {
+        return new String[] {"--fmod-dir", getApplicationInfo().nativeLibraryDir};
+    }
 }
