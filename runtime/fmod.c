@@ -152,8 +152,11 @@ static const char *load_native(void) {
             return err;
         }
     }
+    // By handle, studio then core: Android's RTLD_DEFAULT skips the RTLD_LOCAL libraries the app's Java side loaded
+    // (FMOD must be loaded there for its JNI_OnLoad).
 #define FMOD_API_SYM(ret, name, params)                                                                \
-    if (!(*(void **)&NATIVE.name = dlsym(RTLD_DEFAULT, "FMOD_" #name))) {                              \
+    if (!(*(void **)&NATIVE.name = dlsym(libs[1], "FMOD_" #name)) &&                                   \
+        !(*(void **)&NATIVE.name = dlsym(libs[0], "FMOD_" #name))) {                                   \
         snprintf(err, sizeof err, "%s has no FMOD_%s", dir, #name);                                    \
         return err;                                                                                    \
     }

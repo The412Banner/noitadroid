@@ -10,6 +10,8 @@ import android.widget.Toast;
 
 import org.libsdl.app.SDLActivity;
 
+import java.io.File;
+
 /**
  * SDL's activity, running libmain.so's SDL_main (runtime/android_main.c). The game files, saves and log live in
  * shared storage (/sdcard/noitadroid), which needs all-files access; FMOD's Java side starts before the native engine.
@@ -42,8 +44,16 @@ public class NoitaActivity extends SDLActivity {
         }
     }
 
+    /**
+     * FMOD's libraries, when the APK has them, load here rather than only by runtime/fmod.c's dlopen: libfmod.so's
+     * JNI_OnLoad keeps the Java VM, which FMOD needs to ask org.fmod.FMOD about the audio output. The dlopen then
+     * gets these same libraries.
+     */
     @Override
     protected String[] getLibraries() {
+        if (new File(getApplicationInfo().nativeLibraryDir, "libfmodstudio.so").exists()) {
+            return new String[] {"SDL2", "fmod", "fmodstudio", "main"};
+        }
         return new String[] {"SDL2", "main"};
     }
 
