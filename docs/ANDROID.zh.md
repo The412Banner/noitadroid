@@ -122,6 +122,8 @@ adb logcat -s noitadroid                     # 也会写到 /sdcard/Android/data
 
 FMOD：运行 `tools/android/setup_fmod.sh`。它会先在 `~/Downloads` 和 `.local-deps` 里找 `fmodstudioapi201*android.tar.gz`；找不到就在终端里询问 fmod.com 账号密码，登录后下载 2.01.23 的 Android 包。账号密码只发给 fmod.com，不会保存。之后它会检查版本必须是 2.01.x，再解压到 `.local-deps/fmod/`，使 `api/core/lib/arm64-v8a/libfmod.so`、`api/studio/lib/arm64-v8a/libfmodstudio.so` 和 `api/core/lib/fmod.jar` 就位。然后 `build_game.py` 会把它们打进 APK。没有 FMOD 时游戏静音运行。FMOD 的库由 `NoitaActivity.getLibraries()` 在 Java 端加载，因为 libfmod.so 要在 `JNI_OnLoad` 里拿到 Java VM，才能向 `org.fmod.FMOD` 查询音频输出。之后 `runtime/fmod.c` 再 dlopen 同一份库，按句柄查找符号，因为 Android 的 `RTLD_DEFAULT` 会跳过 Java 加载的 RTLD_LOCAL 库。已在 Pocket S 上验证：2.01.23 正常工作，走 AAudio 低延迟 MMAP 输出。
 
+首屏引导：启动器入口是 `SetupActivity`。它用 `GameCheck` 检查四项：所有文件访问权限、`/sdcard/noitadroid/Noita` 里的 noita.exe、msvcp120.dll 和 data/data.wak、游戏版本（比对哈希），以及 FMOD 是否在 APK 里。比对的标准是 `build_game.py` 在构建时写进 `assets/noitadroid.properties` 的值：构建者那份游戏里 noita.exe 和 msvcp120.dll 的 sha256、data.wak 的大小、FMOD 版本。必需项都满足时，它直接启动 `NoitaActivity`，不显示任何界面（第一次要算哈希，约 0.1 秒，之后按文件大小和修改时间缓存）。否则显示中英文的检查清单，每项都写明该怎么做，触屏和手柄都能操作，回到前台时会自动重查。拿到权限后它会自动建好 Noita 文件夹，方便通过 USB 拷贝。已在 Pocket S 上测过：一切就绪、没有权限、缺游戏文件、版本不对四种情况，以及手柄 A 键重查。
+
 手柄：SDL 默认把 Android 的加速度计注册成摇杆，而游戏会把任何摇杆都当手柄用，结果菜单光标会跟着机身倾斜跑。`runtime/android_main.c` 因此关掉了 `SDL_HINT_ACCELEROMETER_AS_JOYSTICK`。排查手柄问题时，在 `/sdcard/noitadroid/` 下放一个 `debug_input` 文件，日志里就会记录每个摇杆和偏离中心的轴；文件内容写 `accelerometer` 可以恢复加速度计摇杆，用来对比。
 
 生成的 APK 里有由游戏转换而来的代码：只装在自己的设备上，不要分发。

@@ -11,6 +11,7 @@ their source, a header, the build scripts or the flags changed.
 import argparse
 import multiprocessing as mp
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -90,6 +91,22 @@ def compile_one(job):
         flags.append("-Dmain=noitadroid_main")  # runtime/android_main.c's SDL_main calls it
     subprocess.run([*flags, str(src), "-o", str(obj)], check=True)
     return obj, True
+
+
+def write_build_info(noita_dir: Path, fmod_staged: bool):
+    """assets/noitadroid.properties: what the app's SetupActivity (GameCheck) compares the game files on the device
+    with. The recompiled code is for the noita.exe and msvcp120.dll of this build's game, so their hashes; data.wak's
+    size tells a copy still going on, or broken off; FMOD's version, when its libraries are in."""
+    import hashlib
+    info = {f"{name}.sha256": hashlib.sha256((noita_dir / name).read_bytes()).hexdigest()
+            for name in ("noita.exe", "msvcp120.dll")}
+    info["data.wak.size"] = (noita_dir / "data/data.wak").stat().st_size
+    header = target.DEPS / "fmod/api/core/inc/fmod_common.h"
+    if fmod_staged and header.exists():
+        v = int(re.search(r"#define FMOD_VERSION\s+0x([0-9a-fA-F]+)", header.read_text()).group(1), 16)
+        info["fmod"] = f"{v >> 16:x}.{v >> 8 & 0xff:02x}.{v & 0xff:02x}"
+    (OUT / "assets").mkdir(exist_ok=True)
+    (OUT / "assets/noitadroid.properties").write_text("".join(f"{k}={v}\n" for k, v in info.items()))
 
 
 ICON_DP = 56  # the glyph's height in the 108 dp adaptive icon: inside the 66 dp circle every launcher mask keeps
@@ -210,7 +227,9 @@ def main():
     print(f"bridges: SDL {n_sdl} thunks, GL {n_gl} generated of {len(bridged)}; {len(srcs)} sources, "
           f"{sum(c for _, c in done)} compiled; "
           f"compile {t2 - t1:.0f}s, link {t3 - t2:.0f}s; libmain.so {libmain.stat().st_size / 1e6:.1f} MB")
-    print("jniLibs:", ", ".join(stage(libmain)))
+    staged = stage(libmain)
+    print("jniLibs:", ", ".join(staged))
+    write_build_info(Path(os.environ["NOITA_DIR"]), fmod_staged="libfmodstudio.so" in staged)
     if not make_icon(Path(os.environ["NOITA_DIR"])):
         print("no data/icon.bmp in NOITA_DIR: the app gets Android's default icon")
     if args.no_apk:

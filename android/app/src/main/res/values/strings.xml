@@ -1,4 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Noita (noitadroid)</string>
+
+    <!-- SetupActivity: shown only when the game can't start yet -->
+    <string name="setup_subtitle">Noita on Android: first start</string>
+    <string name="setup_intro">This app doesn\'t contain Noita: it runs your own copy of the game, the Windows version from GOG (build %1$s), recompiled for Android. On the right is what it still needs. Once everything is there, the app goes straight into the game.</string>
+    <string name="setup_ready">Everything\'s ready.</string>
+    <string name="setup_not_ready">Not ready yet: see the items marked ✕.</string>
+    <string name="start">Start Noita</string>
+    <string name="recheck">Check again</string>
+
+    <string name="access_title">Storage access</string>
+    <string name="access_ok">Granted. The game is read from %1$s, and saves are kept there too.</string>
+    <string name="access_missing">Needed to read the game from shared storage, where you can copy it over USB, and to keep saves when the app is reinstalled. Android calls it \"All files access\".</string>
+    <string name="access_action">Grant</string>
+
+    <string name="files_title">Game files</string>
+    <string name="files_waiting">Checked once storage access is granted.</string>
+    <string name="files_missing_all">Copy everything in your Noita folder (the one with noita.exe in it) into %1$s. Over USB, that\'s Internal storage › noitadroid › Noita; the folder is already there. With adb, tools/android/push_game.sh does it.</string>
+    <string name="files_missing_some">%1$s has part of the game, but not: %2$s. Copy the whole Noita folder (the one with noita.exe in it).</string>
+    <string name="files_incomplete">data/data.wak is %1$s, but should be %2$s: the copy isn\'t complete (or is still going).</string>
+    <string name="files_ok">Found in %1$s.</string>
+
+    <string name="version_title">Game version</string>
+    <string name="version_waiting">Checked once the game files are there.</string>
+    <string name="version_wrong">%1$s isn\'t from the build this app was made for: Noita for Windows from GOG, build %2$s (Jan 25 2025). The Steam version and other builds don\'t work.</string>
+    <string name="version_ok">GOG build %1$s, the one this app was made for.</string>
+
+    <string name="sound_title">Sound (FMOD)</string>
+    <string name="sound_ok">FMOD %1$s is in this app.</string>
+    <string name="sound_missing">This app was built without FMOD, so the game is silent. FMOD\'s license doesn\'t allow sharing it: whoever builds the app adds it (tools/android/setup_fmod.sh). Not needed to play.</string>
 </resources>

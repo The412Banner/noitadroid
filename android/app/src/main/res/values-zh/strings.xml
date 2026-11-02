@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_subtitle">Noita 安卓版：首次启动</string>
+    <string name="setup_intro">这个应用里没有 Noita 本体：它运行的是你自己的那份游戏，也就是 GOG 上的 Windows 版（版本 %1$s），重编译到了 Android 上。右边列出了它还需要什么。全部就绪后，打开应用会直接进入游戏。</string>
+    <string name="setup_ready">全部就绪。</string>
+    <string name="setup_not_ready">还没准备好：请看标 ✕ 的项。</string>
+    <string name="start">开始游戏</string>
+    <string name="recheck">重新检查</string>
+
+    <string name="access_title">存储访问权限</string>
+    <string name="access_ok">已授予。游戏从 %1$s 读取，存档也保存在那里。</string>
+    <string name="access_missing">需要它才能从共享存储读取游戏（你可以通过 USB 把游戏拷进去），重装应用时存档也不会丢。Android 设置里叫「所有文件访问权限」。</string>
+    <string name="access_action">去授权</string>
+
+    <string name="files_title">游戏文件</string>
+    <string name="files_waiting">授予存储权限后才能检查。</string>
+    <string name="files_missing_all">把你的 Noita 文件夹（有 noita.exe 的那个）里的所有内容拷到 %1$s。用 USB 连电脑时，它在「内部存储 › noitadroid › Noita」，文件夹已经建好了。用 adb 的话，tools/android/push_game.sh 会帮你拷。</string>
+    <string name="files_missing_some">%1$s 里有一部分游戏文件，但缺少：%2$s。请把整个 Noita 文件夹（有 noita.exe 的那个）拷进来。</string>
+    <string name="files_incomplete">data/data.wak 现在是 %1$s，应该是 %2$s：没拷完（或者还在拷）。</string>
+    <string name="files_ok">已在 %1$s 找到。</string>
+
+    <string name="version_title">游戏版本</string>
+    <string name="version_waiting">游戏文件就位后才能检查。</string>
+    <string name="version_wrong">%1$s 不是这个应用对应的版本。需要的是 GOG 上 Windows 版的 Noita，版本 %2$s（2025 年 1 月 25 日）。Steam 版和其他版本都不行。</string>
+    <string name="version_ok">GOG 版 %1$s，与这个应用对应。</string>
+
+    <string name="sound_title">声音（FMOD）</string>
+    <string name="sound_ok">此应用已包含 FMOD %1$s。</string>
+    <string name="sound_missing">这个应用构建时没有加入 FMOD，所以游戏没有声音。FMOD 的许可证不允许分享它，只能由构建应用的人自己加入（tools/android/setup_fmod.sh）。不影响游玩。</string>
+</resources>

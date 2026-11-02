@@ -42,6 +42,7 @@ android {
             java.srcDir(repo.resolve(".local-deps/src/SDL2/android-project/app/src/main/java"))
             jniLibs.srcDir(repo.resolve("build/android/jniLibs"))
             res.srcDir(iconRes)
+            assets.srcDir(repo.resolve("build/android/assets"))  // noitadroid.properties: the game build's facts
         }
     }
 
