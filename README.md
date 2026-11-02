@@ -1,172 +1,156 @@
-# mina4mac
+# noitadroid
 
-Native Noita on Apple Silicon, without Wine or Rosetta. `noita.exe` (32-bit x86) is statically recompiled to C
-and compiled for ARM64, and a native runtime (`runtime/`, see its README) stands in for Windows and the game's
-DLLs: SDL2, OpenGL, LuaJIT and FMOD are bridged to their macOS versions.
+**Noita on Android, natively.** noitadroid runs the Windows game, statically recompiled to ARM64, on Android
+handhelds and phones. It has no emulator and no Wine or Proton. It's built on
+[mina4mac](https://github.com/paulstraw/mina4mac), which does the same for Apple Silicon Macs.
+
+[中文说明](README.zh-CN.md)
+
+It plays on an AYANEO Pocket S (Snapdragon G3x Gen 2, Android 13):
+- Fullscreen 1920×1080, with 50–60 fps in the early caves.
+- Full sound (FMOD), and the built-in gamepad and the touchscreen both work.
+- An in-game menu with save export/import, gamepad button swaps, and an FPS and temperature display.
+
+Other devices are untested so far. Reports are welcome.
+
+> This repository contains no game code or assets, so there's no APK to download. You build the app yourself, from
+> **your own copy of Noita from GOG**. The app you build contains code derived from your game and FMOD's libraries:
+> keep it on your own devices, and **don't share the APK**.
+
+## How it works
+
+- **The game.** mina4mac's recompiler turns the 32-bit x86 `noita.exe` (and `msvcp120.dll`) into C.
+  The NDK compiles that C to ARM64.
+- **The runtime.** It stands in for the Windows DLLs the game uses: kernel32 and the C runtime, plus bridges to
+  native SDL2, LuaJIT (with its ARM64 JIT) and FMOD.
+- **Graphics.** The game's desktop OpenGL 2.1 runs on [gl4es](https://github.com/ptitSeb/gl4es) over GLES 3.0.
+- **The Android app.** SDL2's activity runs the game. Around it:
+  - a first-start screen checks what's missing;
+  - a menu slides in from the left edge;
+  - the files live in shared storage, so you can copy the game and your saves over USB.
 
 ## What you need
 
-- A Mac with Apple Silicon (M1 or later), macOS 14 or later, and a few GB of free disk space.
-- Noita for Windows from GOG, the build of Jan 25 2025 (version `20250125-1640` on GOG). See [Supported builds](#supported-builds).
-- About 15 minutes, most of it waiting for the build.
+- **Noita for Windows from GOG**, build `20250125-1640` (Jan 25 2025). Use the offline installer
+  `setup_noita_20250125-1640_(79502).exe` and its `.bin` files. The Steam version won't work: the recompiled code
+  is for this one build.
+- **An Android device:**
+  - arm64, Android 10 or later, with OpenGL ES 3.0;
+  - about 2 GB free;
+  - a gamepad is recommended.
+- **A Linux x86_64 PC to build on.** These steps were tested on Ubuntu 24.04. A build takes about 15 minutes on
+  12 cores.
+- **Optional, for sound:** FMOD Engine **2.01.x** for Android. You download it yourself from
+  [fmod.com](https://www.fmod.com/download) (a free account), because its license doesn't allow sharing it.
+  Without it, the game runs silently.
 
-This repository contains no game code or assets, so there's no download-and-play app: you build `Noita.app`
-yourself from your own copy of the game. The steps below take you through it. (The repository does include facts
-observed in the binary: the runtime is written against addresses and data layouts in one build of `noita.exe`, and
-`tools/icall_targets.txt` lists indirect call sites and the targets seen there at run time. The recompiled C is
-generated on your Mac and is never committed or shipped.)
+## Build
 
-## Install
-
-All commands go in Terminal (Applications → Utilities → Terminal).
-
-### 1. Install the tools
-
-Install Apple's command line developer tools (a dialog opens; click Install):
-
-```sh
-xcode-select --install
-```
-
-Install [Homebrew](https://brew.sh) if you don't have it (follow the instructions on its home page), then:
+### 1. Tools
 
 ```sh
-brew install sdl2 uv
+sudo apt install git clang lld cmake ninja-build make innoextract openjdk-17-jdk libsdl2-dev libgles-dev libegl-dev
+curl -LsSf https://astral.sh/uv/install.sh | sh        # uv runs the build scripts
 ```
 
-Homebrew's `sdl2` is sdl2-compat, an SDL2 layer that runs on SDL3; it installs SDL3 too, and step 5 copies both into
-the app.
-
-### 2. Get mina4mac
+Install the Android SDK, from Android Studio or the command-line tools, with these packages:
 
 ```sh
-git clone --recursive https://github.com/paulstraw/mina4mac.git
-cd mina4mac
+sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "ndk;29.0.14206865"
 ```
 
-The remaining commands run from this `mina4mac` folder. If you cloned without `--recursive`, run
-`git submodule update --init` once.
+### 2. The repository
 
-### 3. Get Noita's Windows files onto your Mac
+```sh
+git clone --recursive https://github.com/zhouwuqi/noitadroid
+cd noitadroid
+mkdir -p .local-deps
+ln -s "$ANDROID_HOME/ndk/29.0.14206865" .local-deps/ndk
+echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+tools/android/deps.sh                                    # builds gl4es and SDL2 into .local-deps
+```
 
-You need the folder that contains `noita.exe` (along with `data/`, `msvcp120.dll` and the rest). There are two
-ways to get it:
+### 3. The game
 
-- **If you already play Noita through Wine** (CrossOver, Whisky, Porting Kit, a Wineskin/Sikarugir wrapper): the
-  game is already installed inside the wrapper, usually at `drive_c/GOG Games/Noita`. For a wrapper app,
-  right-click it in Finder, choose Show Package Contents, and look under `Contents/SharedSupport/prefix/` (or
-  similar). Leave it where it is.
-- **Otherwise**, unpack GOG's offline installer. On gog.com, open your library, select Noita, and under the
-  Windows downloads choose the offline backup installer (`setup_noita_….exe`, plus any `.bin` files listed next
-  to it; download them all to the same folder). Then:
+```sh
+innoextract --gog -d .local-deps/noita-gog "setup_noita_20250125-1640_(79502).exe"
+export NOITA_DIR=$PWD/.local-deps/noita-gog
+```
 
-  ```sh
-  brew install innoextract
-  innoextract --gog -d ~/Games/Noita ~/Downloads/setup_noita_*.exe
-  ```
+### 4. Sound (optional, recommended)
 
-  The game folder is `~/Games/Noita`, or `~/Games/Noita/app` if innoextract put the files in an `app` subfolder:
-  use whichever one contains `noita.exe`.
+Download **FMOD Engine 2.01.23 for Android** (`fmodstudioapi20123android.tar.gz`) from fmod.com/download. Pick
+2.01.23 in the version list; it's an older version. Then run:
 
-Keep this folder where it is: the app runs the game from it.
+```sh
+tools/android/setup_fmod.sh path/to/fmodstudioapi20123android.tar.gz
+```
 
-### 4. Set up sound (optional, recommended)
-
-Noita uses the FMOD audio engine, and FMOD's license doesn't allow redistributing it, so you download it yourself.
-Without it, the game runs silently. The game ships FMOD 2.01, so you need a 2.01 version (2.02 and later won't
-work):
-
-1. Create a free account at [fmod.com](https://www.fmod.com) (Sign in → Register) and sign in.
-2. Go to [fmod.com/download](https://www.fmod.com/download) and find **FMOD Engine**. Pick version **2.01.23**
-   from the version list (it's an older version, so you may have to open the older versions list); any 2.01.x
-   works, but 2.01.23 is the one that's been tested.
-3. Download the **Mac** installer. You get `fmodstudioapi20123mac-installer.dmg` in your Downloads folder.
-4. Back in Terminal, in the `mina4mac` folder:
-
-   ```sh
-   tools/setup_fmod.sh
-   ```
-
-   It looks for that file in `~/Downloads`; if yours is elsewhere or a different 2.01 version, pass its path:
-   `tools/setup_fmod.sh ~/path/to/fmodstudioapi201XXmac-installer.dmg`. It should finish with a line starting
-   `FMOD 0x000201`.
-
-If you skip this now, you can do it later and repeat step 5.
+Without an argument, the script looks in `~/Downloads`. If there's nothing there, it asks for your fmod.com account
+and downloads the file itself. It refuses any version other than 2.01.x.
 
 ### 5. Build the app
 
-Pass the game folder from step 3. (Tip: type the command up to the opening quote, then drag the folder from Finder
-into the Terminal window to paste its path, and remove the extra quotes if it added its own.)
-
 ```sh
-tools/package_app.sh "/path/to/Noita"
+for m in noita msvcp120; do uv run tools/discover.py $m; done   # once
+uv run tools/build_all.py                 # recompiles the game to C (and builds the Linux version)
+uv run tools/android/build_game.py        # the APK: build/android/noitadroid.apk
 ```
 
-This checks that your `noita.exe` is the supported build, then recompiles it for your Mac. It takes about 5 minutes
-on an M1 Max, and your fans may spin up. It ends with a line like
-`build/Noita.app: game /path/to/Noita, FMOD yes`. (FMOD `no` means step 4 wasn't done: the game will be silent.)
-
-### 6. Play
-
-Copy the app to your Applications folder (or anywhere else) and open it. The name below keeps it from clashing
-with a Wine wrapper that may already be called `Noita.app`:
+### 6. Install and copy the game
 
 ```sh
-ditto build/Noita.app ~/Applications/"Noita (mina4mac).app"
-open ~/Applications/"Noita (mina4mac).app"
+adb install -r build/android/noitadroid.apk
 ```
 
-**Existing saves.** mina4mac keeps its own saves, laid out like a Windows profile, in
-`~/Library/Application Support/mina4mac/AppData/LocalLow/Nolla_Games_Noita/`. To continue a run from Windows or
-Wine, open the app once so that folder exists, quit it, and copy your old `Nolla_Games_Noita` folder's contents
-there (from `%USERPROFILE%\AppData\LocalLow\` on Windows, or `drive_c/users/<name>/AppData/LocalLow/` in a Wine
-prefix). Back up both sides first.
+Open **Noita (noitadroid)** on the device. Its first screen shows what's still missing and what to do about each
+item:
+1. **All files access.** The app reads the game from, and keeps saves in, `/sdcard/noitadroid`.
+2. **The game files.** Copy everything in your Noita folder (the one with `noita.exe`) into
+   `Internal storage/noitadroid/Noita`, over USB, or run `tools/android/push_game.sh` with adb. That's about
+   1.5 GB.
 
-**Updating mina4mac.** In the `mina4mac` folder, run `git pull && git submodule update --init`, then repeat steps
-5 and 6. Do the same if you move the game folder.
+Once everything is there, the app goes straight into the game.
 
-## Supported builds
+## Playing
 
-Only the GOG build of Jan 25 2025 (listed on GOG as version `20250125-1640`) is supported, and step 5 refuses any other `noita.exe`. The Steam version is a
-different binary and doesn't work. When Noita is patched, the runtime has to be updated for the new build before it
-works, so keep a copy of the supported game folder (and its installer).
-
-Tested on an M1 Max with macOS 26.6. Other chips and macOS versions haven't been tried yet, so please include yours
-in bug reports.
+- **Controls.** The gamepad and touch work as in the PC game: touch acts as the mouse.
+- **The in-game menu.** Swipe right from the middle of the screen's left edge. Gesture navigation's back swipe
+  keeps the rest of that edge. The game pauses while the menu is open. The menu has:
+  - **Saves.** Export to a zip laid out like the Windows game's `Nolla_Games_Noita` folder. Import from such a zip,
+    from Android or Windows; the current save is kept as `save00.backup-<date>`, and the game restarts.
+  - **Gamepad buttons.** Swap buttons (say A and B) for the game. The game's own settings can also rebind its
+    actions.
+  - **FPS and temperatures.** A small display at the top of the screen.
+- **Files** on the device:
+  - `/sdcard/noitadroid/Noita/`: the game.
+  - `/sdcard/noitadroid/save/AppData/LocalLow/Nolla_Games_Noita/`: the saves. Uninstalling keeps them.
+  - `/sdcard/noitadroid/noitadroid.log`: the log, also in `adb logcat -s noitadroid`.
 
 ## Troubleshooting
 
-- **"… is not the supported build"**: your `noita.exe` is a different version (or the Steam build). See
-  [Supported builds](#supported-builds).
-- **"no Noita install at …"**: the path in step 5 isn't the folder that contains `noita.exe` and `data/`.
-- **No sound**: step 4 wasn't done, or was done after step 5. Run `tools/setup_fmod.sh`, then steps 5 and 6 again.
-- **"Failed loading SDL3 library"** (in the log, or the app quits at once): the app was built before step 5
-  bundled SDL3. Update mina4mac (`git pull`) and run steps 5 and 6 again.
-- **"Noita install not found" when opening the app**: the game folder moved or was deleted. Run steps 5 and 6
-  again with its new location.
-- **Crashes or other bugs**: [open an issue](https://github.com/paulstraw/mina4mac/issues) with your Mac's chip
-  and macOS version, and attach the log, `~/Library/Logs/mina4mac.log`. The previous launch's log is
-  `mina4mac.log.1`, so it survives one relaunch.
+- **The first screen says the version is wrong.** Your `noita.exe` isn't GOG build 20250125-1640, or it isn't the
+  build the app was made from.
+- **No sound.** The app was built without FMOD (its first screen says so), or with a version other than 2.01.x.
+- **Gamepad trouble.** Put an empty file named `debug_input` in `/sdcard/noitadroid/`. The log then lists the
+  gamepads and their axes.
+- Anything else: look at `/sdcard/noitadroid/noitadroid.log` and open an issue.
 
 ## Development
 
-`docs/PLAN.md` and `docs/PLAN2.md` describe the design and record the history. The tools work on a copy of the game in
-`build/game`: copy the binaries there, then `tools/setup_game.sh` adds `data/` and `mods/`.
-`uv run tools/build_all.py` builds `build/mina4mac` with ThinLTO (about 3 minutes; `--lto off` skips it), and
-`tools/check.sh` runs the verification sequence. `tools/determinism.sh run` checks world generation against the Wine
-build without clicks. The build first runs `tools/regsum.py`, which proves per function which callee-saved registers
-it preserves and how many argument bytes it pops, so call sites can skip reloads (cached in `build/<module>/regsum.pkl`;
-about 2 minutes when the lifter changes). `build_all.py --sync check` builds a binary that verifies every skipped
-reload at run time and exits 12 on a wrong summary; `--sync full` turns the optimization off.
+- [docs/ANDROID.zh.md](docs/ANDROID.zh.md) has the port's notes: its design, its phases, and device testing (in
+  Chinese).
+- [docs/README.mina4mac.md](docs/README.mina4mac.md) is mina4mac's README, for the recompiler and the macOS build.
+- The runtime's tests run on the device too: `tools/android/build_tests.sh`, then
+  `tools/android/device_check.sh`.
 
-Optional profile-guided build: `tools/pgo.sh` builds an instrumented `build/mina4mac`, trains it on the perfbench
-scenes (`tools/perfbench.sh install mina4mac` first; about 10 minutes, since the instrumented game runs ~12× slower),
-merges the profile into `build/pgo/mina4mac.profdata`, writes an order file (hottest functions first) and rebuilds
-with both (`tools/build_all.py --pgo use --order`). The profile is derived from your own copy of the game, so it
-stays in `build/` and is never committed. The gain is small (see `docs/PLAN3.md`, Phase 10), and the default build doesn't use it.
+## Credits and license
 
-## License
+- **mina4mac** by Paul Straw, the recompiler and runtime this port is built on. MIT.
+- **Bundled code** keeps its own license: [LuaJIT](https://luajit.org) (MIT), [gl4es](https://github.com/ptitSeb/gl4es)
+  (MIT) and [SDL2](https://libsdl.org) (zlib).
+- **FMOD** is under FMOD's own license, and you download it yourself.
+- **noitadroid's own code** is MIT; see [LICENSE](LICENSE).
 
-MIT, see `LICENSE`. Bundled third-party code keeps its own license: LuaJIT (`third_party/luajit`, MIT) and the
-Khronos OpenGL registry (`third_party/khronos/gl.xml`, Apache-2.0). SDL2 (sdl2-compat) and SDL3 (both zlib) and, if you set it up, FMOD (under
-FMOD's own license) are copied into the app you build. Noita is © Nolla Games; this project isn't affiliated with them.
+Noita is © Nolla Games. This project isn't affiliated with or endorsed by Nolla Games, GOG or Firelight
+Technologies.

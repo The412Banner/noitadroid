@@ -103,7 +103,7 @@ uv run tools/build_all.py                    # 先做宿主构建：重编译出
 uv run tools/android/build_game.py           # 约 5 分钟：桥按 Android 重新生成，NDK 编译，ThinLTO 链接成 libmain.so，打 APK
 adb install -r build/android/noitadroid.apk
 tools/android/push_game.sh                   # 约 1.5 GB：noita.exe、msvcp120.dll、data/、mods/ 等
-adb logcat -s noitadroid                     # 也会写到 /sdcard/Android/data/io.github.zhouwuqi.noitadroid/files/noitadroid.log
+adb logcat -s noitadroid                     # 也会写到 /sdcard/noitadroid/noitadroid.log
 ```
 
 设备上的目录都在 `/sdcard/noitadroid/` 下（共享存储，App 需要「所有文件访问权限」，`push_game.sh` 会用 `appops` 授予）：
