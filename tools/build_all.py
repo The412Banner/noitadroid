@@ -38,6 +38,7 @@ import slots  # noqa: E402
 from pe import MODULES, build_dir  # noqa: E402
 import gen_gl  # noqa: E402
 import gen_sdl  # noqa: E402
+import target  # noqa: E402
 
 GEN = ROOT / "build/gen_all"
 LAUNCHER = ("main.c", "heap.c", "proc.c", "msvcr120.c", "msvcr120_stdio.c", "msvcr120_string.c", "kernel32.c", "kernel32_file.c", "undname.c", "msvcr120_concrt.c", "sync.c", "hle.c", "msvcr120_math.c", "shlwapi.c", "shell32.c", "galaxy.c", "wininet.c", "ws2_32.c", "user32.c", "fmod.c", "fmod_stub.c", "opengl32.c", "thread.c", "sdl2_stdlib.c", "joblog.c", "sched.c")  # runtime files only the launcher links
@@ -136,18 +137,18 @@ def _lift_chunk(args):
 
 
 def build_luajit():
-    """Build the static host LuaJIT 2.1 (ARM64, JIT enabled) from the submodule; make is incremental."""
+    """Build the static LuaJIT 2.1 for the target (JIT enabled) from the submodule; make is incremental."""
     if not (LUAJIT_SRC / "src/lua.h").exists():
         sys.exit("third_party/luajit is missing: git submodule update --init")
     LUAJIT_BUILD.mkdir(parents=True, exist_ok=True)
     subprocess.run(["rsync", "-a", "--exclude", ".git", f"{LUAJIT_SRC}/", f"{LUAJIT_BUILD}/"], check=True)
     subprocess.run(["make", "-C", str(LUAJIT_BUILD), f"-j{os.cpu_count()}", "BUILDMODE=static", "amalg",
-                    "MACOSX_DEPLOYMENT_TARGET=14.0"], check=True, capture_output=True)
+                    *target.luajit_make()], check=True, capture_output=True)
     return LUAJIT_LIB
 
 
 def _sdl_config(flag):
-    return subprocess.run(["sdl2-config", flag], capture_output=True, text=True, check=True).stdout.split()
+    return target.sdl_cflags() if flag == "--cflags" else target.sdl_libs()
 
 
 def _pgo_flags(mode):
@@ -167,8 +168,9 @@ def _cc(job):
     obj = (src.parent if src.name.startswith("chunk") else GEN) / (src.stem + ".o")
     sdl = _sdl_config("--cflags") if src.stem.startswith("sdl2") and src.stem != "sdl2_stdlib" else []
     lua = LUA_CFLAGS if src.name in LUA else []
-    subprocess.run(["clang", "-c", f"-{opt}", "-ffp-contract=off", "-fno-strict-aliasing", "-w", *sdl, *lua, *extra,
-                    "-I", str(ROOT / "runtime"), "-I", str(GEN), str(src), "-o", str(obj)], check=True)
+    subprocess.run([*target.cc(), "-c", f"-{opt}", "-ffp-contract=off", "-fno-strict-aliasing", "-w", *sdl, *lua, *extra,
+                    *target.platform_cflags(), *target.runtime_includes(ROOT / "runtime", GEN), str(src), "-o", str(obj)],
+                   check=True)
     return obj
 
 
@@ -252,17 +254,19 @@ def main():
     only = {"harness", "bench"} | {Path(n).stem for n in launcher}
     common = [str(o) for o in objs if o.stem not in only]
     exe = ROOT / "build/harness_all"
-    link = ["clang", *pgo[:1]]  # the instrumented build links the profile runtime
+    link = [*target.cc(), *target.linker(), *pgo[:1]]  # the instrumented build links the profile runtime
     if lto:  # the link does the codegen; the cache lets the 3 links share it. ld64 ignores -O here (and
         # -Wl,-mllvm,-O3): the compile-time --opt still changes the bitcode, fp-contract/aliasing ride along in it.
         LTO_CACHE.mkdir(parents=True, exist_ok=True)
-        link += [*lto, f"-Wl,-cache_path_lto,{LTO_CACHE}"]
+        link += [*lto, *target.lto_cache(LTO_CACHE)]
     if args.order:  # the hot functions of the launcher; harness and bench just get the same layout
-        link += [f"-Wl,-order_file,{PGO_ORDER}"]
-    subprocess.run([*link, *common, str(GEN / "harness.o"), "-o", str(exe)], check=True)
-    subprocess.run([*link, *common, str(GEN / "bench.o"), "-o", str(ROOT / "build/bench")], check=True)
+        link += target.order_file(PGO_ORDER)
+    libs = target.sys_libs()
+    subprocess.run([*link, *common, str(GEN / "harness.o"), *libs, "-o", str(exe)], check=True)
+    subprocess.run([*link, *common, str(GEN / "bench.o"), *libs, "-o", str(ROOT / "build/bench")], check=True)
     subprocess.run([*link, *common, *(str(GEN / (Path(n).stem + ".o")) for n in launcher),
-                    str(LUAJIT_LIB), *_sdl_config("--libs"), "-framework", "OpenGL", "-o", str(ROOT / "build/mina4mac")], check=True)
+                    str(LUAJIT_LIB), *_sdl_config("--libs"), *target.gl_libs(), *libs, "-o", str(ROOT / "build/mina4mac")],
+                   check=True)
     t3 = time.time()
     src_mb = sum(s.stat().st_size for s in chunk_srcs) / 1e6
     print(f"functions {len(starts):,} (stubbed {failed:,}); MINA4MAC_TSO={prog.tso_mode}; pgo {args.pgo or 'off'}{', order file' if args.order else ''}; -{args.opt}{', lto ' + args.lto if lto else ''}; {args.chunking} chunks; "

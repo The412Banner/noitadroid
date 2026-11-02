@@ -26,6 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 from pe import ROOT, load  # noqa: E402
+import target  # noqa: E402
 
 GEN = ROOT / "build/gen_all"
 HLE = {"SDL_malloc", "SDL_free", "SDL_isspace", "SDL_wcslen", "SDL_iconv_string", "SDL_SetMainReady"}  # sdl2_stdlib.c
@@ -49,8 +50,7 @@ GUEST = ["-target", "i686-pc-windows-msvc", "-ffreestanding", "-nostdlibinc", "-
 
 
 def sdl_include() -> str:
-    flags = subprocess.run(["sdl2-config", "--cflags"], capture_output=True, text=True, check=True).stdout.split()
-    return next(f[2:] for f in flags if f.startswith("-I"))
+    return target.sdl_include()
 
 
 def clang(args, src, guest):
@@ -58,8 +58,9 @@ def clang(args, src, guest):
     work.mkdir(parents=True, exist_ok=True)
     (work / "probe.c").write_text(src)
     (work / "guest_config.h").write_text(GUEST_CONFIG)
+    # The host side's layouts come from the target's compiler (Android: arm64); the guest's from any clang.
     extra = [*GUEST, "-include", str(work / "guest_config.h")] if guest else []
-    p = subprocess.run(["clang", *extra, "-I", sdl_include(), *args, str(work / "probe.c")],
+    p = subprocess.run([*(["clang"] if guest else target.cc()), *extra, "-I", sdl_include(), *args, str(work / "probe.c")],
                        capture_output=True, text=True)
     if p.returncode:
         sys.exit(f"clang failed:\n{p.stderr[:2000]}")

@@ -33,8 +33,8 @@ static uint32_t mkdirs(const char *host) {
     return mkdir(p, 0755) && errno != EEXIST ? ERROR_PATH_NOT_FOUND : ERROR_SUCCESS;
 }
 
-// Known folders live under ~/Library/Application Support/mina4mac/, laid out like a Windows profile. Noita
-// only asks for LocalLow (its saves go in LocalLow\Nolla_Games_Noita).
+// Known folders live under ~/Library/Application Support/mina4mac/, or $MINA4MAC_DATA when set (Linux and
+// Android), laid out like a Windows profile. Noita only asks for LocalLow (its saves go in LocalLow\Nolla_Games_Noita).
 static const struct { uint8_t guid[16]; const char *dir; } KNOWN[] = {
     // FOLDERID_LocalAppDataLow {A520A1A4-1780-4FF6-BD18-167343C5AF16}
     {{0xa4, 0xa1, 0x20, 0xa5, 0x80, 0x17, 0xf6, 0x4f, 0xbd, 0x18, 0x16, 0x73, 0x43, 0xc5, 0xaf, 0x16}, "AppData/LocalLow"},
@@ -49,9 +49,14 @@ HOST_STDCALL(shell32, SHGetKnownFolderPath, 16) {
         const char *home = getenv("HOME");
         char host[4096], win[4096];
         char base[4096], old[4096];
-        snprintf(base, sizeof base, "%s/Library/Application Support/mina4mac", home ? home : "");
-        snprintf(old, sizeof old, "%s/Library/Application Support/noitamac", home ? home : "");
-        if (access(base, F_OK) && !access(old, F_OK)) rename(old, base);  // the project's old name: keep its saves
+        const char *data = getenv("MINA4MAC_DATA");
+        if (data && *data) {
+            snprintf(base, sizeof base, "%s", data);
+        } else {
+            snprintf(base, sizeof base, "%s/Library/Application Support/mina4mac", home ? home : "");
+            snprintf(old, sizeof old, "%s/Library/Application Support/noitamac", home ? home : "");
+            if (access(base, F_OK) && !access(old, F_OK)) rename(old, base);  // the project's old name: keep its saves
+        }
         snprintf(host, sizeof host, "%s/%s", base, KNOWN[i].dir);
         if ((ARG(1) & KF_FLAG_CREATE) && mkdirs(host) > ERROR_ALREADY_EXISTS) return ret_i32(c, E_FAIL);
         if (!win_path(host, win, sizeof win)) return ret_i32(c, E_FAIL);

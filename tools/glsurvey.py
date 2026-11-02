@@ -19,6 +19,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+import target
+
 ROOT = Path(__file__).resolve().parent.parent
 GAME = ROOT / "build" / "game"
 OUT = ROOT / "build" / "shaders"
@@ -40,10 +42,9 @@ def wak_files(path):
 
 
 def header_names(*headers):
-    sdk = subprocess.run(["xcrun", "--show-sdk-path"], capture_output=True, text=True, check=True).stdout.strip()
     names = set()
     for h in headers:
-        text = (Path(sdk) / "System/Library/Frameworks/OpenGL.framework/Headers" / h).read_text(errors="replace")
+        text = (target.gl_header_dir() / h).read_text(errors="replace")
         names |= set(re.findall(r"\b(gl[A-Z]\w*)\s*\(", text))
     return names
 
@@ -71,7 +72,8 @@ def main():
     for n in called:
         print(f"  {gl[n]:>12,}  {n}")
 
-    legacy, core = header_names("gl.h", "glext.h"), header_names("gl3.h", "gl3ext.h")
+    legacy = header_names("gl.h", "glext.h")
+    core = header_names(*(("gl3.h", "gl3ext.h") if target.APPLE else ("glcorearb.h",)))
     wgl = {n for n in gl if n.startswith("wgl")}
     for label, have in (("legacy 2.1", legacy), ("core 4.1", core)):
         miss_called = [n for n in called if n not in have and n not in wgl]

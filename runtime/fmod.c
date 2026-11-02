@@ -140,7 +140,11 @@ static const char *load_native(void) {
         snprintf(dir, sizeof dir, "%s/fmod_api/lib", path);
     }
     void *libs[2];
+#ifdef __APPLE__
     const char *names[2] = {"libfmod.dylib", "libfmodstudio.dylib"};  // core first: studio links @rpath/libfmod.dylib
+#else
+    const char *names[2] = {"libfmod.so", "libfmodstudio.so"};  // FMOD's Linux and Android packages both have these
+#endif
     for (int i = 0; i < 2; i++) {
         snprintf(path, sizeof path, "%s/%s", dir, names[i]);
         if (!(libs[i] = dlopen(path, RTLD_NOW | RTLD_GLOBAL))) {

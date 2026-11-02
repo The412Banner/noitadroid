@@ -6,6 +6,8 @@
 # Usage: tools/check.sh [seed]   (default: random; printed so a run can be repeated)
 set -uo pipefail
 cd "$(dirname "$0")/.."
+# Compiler, include and link flags of the build target (tools/target.py: NOITADROID_TARGET, default the host).
+eval "$(uv run tools/target.py --shell)"
 
 SEED=${1:-$RANDOM}
 LOG=build/check
@@ -70,8 +72,8 @@ else
     echo "importtest: FAIL, see $LOG/importtest.log"; status=1
 fi
 
-if clang -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror -I runtime runtime/host_test.c runtime/rt.c \
-        -o build/hosttest >"$LOG/hosttest.log" 2>&1 && build/hosttest >>"$LOG/hosttest.log" 2>&1; then
+if $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS $RT_INC runtime/host_test.c runtime/rt.c \
+        $SYS_LIBS -o build/hosttest >"$LOG/hosttest.log" 2>&1 && build/hosttest >>"$LOG/hosttest.log" 2>&1; then
     echo "hosttest: ok $(grep -c ' ok ' "$LOG/hosttest.log") checks"
 else
     echo "hosttest: FAIL, see $LOG/hosttest.log"; status=1
@@ -80,8 +82,8 @@ fi
 # envtest needs build/noita/image.bin, which difftest writes, and build/gen_all/gl_gen.c (tools/gen_gl.py via build_all).
 # The launcher's runtime files (build_all.py LAUNCHER) minus main.c.
 HLE=$(sed -nE 's/^LAUNCHER = \((.*)\).*/\1/p' tools/build_all.py | tr -d '",' | tr ' ' '\n' | grep -v '^main.c$' | sed 's|^|runtime/|')
-if clang -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror -I runtime runtime/env_test.c runtime/rt.c -framework OpenGL \
-        $HLE build/gen_all/gl_gen.c -o build/envtest >"$LOG/envtest.log" 2>&1 \
+if $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS $RT_INC runtime/env_test.c runtime/rt.c $GL_LIBS \
+        $HLE build/gen_all/gl_gen.c $SYS_LIBS -o build/envtest >"$LOG/envtest.log" 2>&1 \
         && build/envtest build/noita/image.bin "${NOITA_DIR:-build/game}/msvcp120.dll" >>"$LOG/envtest.log" 2>&1; then
     echo "envtest: ok $(grep -c ' ok ' "$LOG/envtest.log") checks"
 else
@@ -101,9 +103,9 @@ else
 fi
 
 # sdltest needs build/gen_all/sdl2_gen.c and sdl2_layout.h, which build_all generates (tools/gen_sdl.py).
-if clang -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror -I runtime -I build/gen_all $(sdl2-config --cflags) \
+if $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS $RT_INC $GEN_INC $SDL_CFLAGS \
         runtime/sdl_test.c runtime/rt.c runtime/heap.c runtime/hle.c runtime/sdl2.c runtime/sdl2_stdlib.c runtime/joblog.c runtime/sched.c runtime/proc.c \
-        build/gen_all/sdl2_gen.c $(sdl2-config --libs) -o build/sdltest >"$LOG/sdltest.log" 2>&1 \
+        build/gen_all/sdl2_gen.c $SDL_LIBS $SYS_LIBS -o build/sdltest >"$LOG/sdltest.log" 2>&1 \
         && build/sdltest >>"$LOG/sdltest.log" 2>&1; then
     echo "sdltest: ok $(grep -c ' ok ' "$LOG/sdltest.log") checks"
 else
@@ -111,18 +113,18 @@ else
 fi
 
 # luatest needs build/luajit/src/libluajit.a, which build_all builds from third_party/luajit.
-if clang -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror -fexceptions -I runtime -I third_party/luajit/src \
+if $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS -fexceptions $RT_INC -I third_party/luajit/src \
         runtime/lua_test.c runtime/lua51.c runtime/rt.c runtime/proc.c runtime/heap.c runtime/hle.c build/luajit/src/libluajit.a \
-        -o build/luatest >"$LOG/luatest.log" 2>&1 && build/luatest >>"$LOG/luatest.log" 2>&1; then
+        $SYS_LIBS -o build/luatest >"$LOG/luatest.log" 2>&1 && build/luatest >>"$LOG/luatest.log" 2>&1; then
     echo "luatest: ok $(grep -c ' ok ' "$LOG/luatest.log") checks; $(grep '^jit: [0-9]' "$LOG/luatest.log")"
 else
     echo "luatest: FAIL, see $LOG/luatest.log"; status=1
 fi
 
 # gltest needs build/gen_all/gl_gen.c; it draws into a framebuffer object of a hidden window's GL context.
-if clang -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror -I runtime $(sdl2-config --cflags) \
+if $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS $RT_INC $SDL_CFLAGS \
         runtime/gl_test.c runtime/opengl32.c build/gen_all/gl_gen.c runtime/rt.c runtime/heap.c runtime/hle.c \
-        $(sdl2-config --libs) -framework OpenGL -o build/gltest >"$LOG/gltest.log" 2>&1 && build/gltest >>"$LOG/gltest.log" 2>&1; then
+        $SDL_LIBS $GL_LIBS $SYS_LIBS -o build/gltest >"$LOG/gltest.log" 2>&1 && build/gltest >>"$LOG/gltest.log" 2>&1; then
     echo "gltest: ok $(grep -c ' ok ' "$LOG/gltest.log") checks"
 else
     echo "gltest: FAIL, see $LOG/gltest.log"; status=1
@@ -130,11 +132,11 @@ fi
 
 # fmodtest needs the macOS FMOD Engine in build/fmod_api (tools/setup_fmod.sh; the user's own download, so it's
 # skipped without it) and the game's banks (tools/setup_game.sh). FMOD_REAL_HEADERS checks fmod.h against the SDK.
-if [ ! -f build/fmod_api/lib/libfmodstudio.dylib ]; then
+if [ ! -f build/fmod_api/lib/libfmodstudio.$DYLIB ]; then
     echo "fmodtest: skipped (no build/fmod_api: run tools/setup_fmod.sh)"
-elif clang -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror -DFMOD_REAL_HEADERS -I build/fmod_api/inc -I runtime \
+elif $CC $PLATFORM_CFLAGS $LINKER -O2 -ffp-contract=off -fno-strict-aliasing -Wall -Wextra -Werror $TEST_CFLAGS -DFMOD_REAL_HEADERS -I build/fmod_api/inc $RT_INC \
         runtime/fmod_test.c runtime/fmod.c runtime/fmod_stub.c runtime/rt.c runtime/proc.c runtime/heap.c runtime/hle.c \
-        -o build/fmodtest >"$LOG/fmodtest.log" 2>&1 && build/fmodtest >>"$LOG/fmodtest.log" 2>&1; then
+        $SYS_LIBS -o build/fmodtest >"$LOG/fmodtest.log" 2>&1 && build/fmodtest >>"$LOG/fmodtest.log" 2>&1; then
     echo "fmodtest: ok $(grep -c ' ok ' "$LOG/fmodtest.log") checks, $(grep -m1 'FMOD runtime' "$LOG/fmodtest.log" | sed 's/^ *//')"
 else
     echo "fmodtest: FAIL, see $LOG/fmodtest.log"; status=1

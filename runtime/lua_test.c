@@ -197,7 +197,12 @@ int main(void) {
                          "..type(require('ffi').new)..type(package.loaded.string)"),
               "functionfunctionfunctionfunctionfunctionfunctionfunctionfunctionfunctionfunctionfunctiontable");
     CHECK_STR("openlibs: io and os work", run(&c, L, "io.write('') return type(os.time())"), "number");
-    CHECK_STR("openlibs: jit on", run(&c, L, "return tostring(jit.status()) .. ' ' .. jit.arch"), "true arm64");
+#if defined(__x86_64__)
+    const char *jit_on = "true x64";  // a Linux development host
+#else
+    const char *jit_on = "true arm64";
+#endif
+    CHECK_STR("openlibs: jit on", run(&c, L, "return tostring(jit.status()) .. ' ' .. jit.arch"), jit_on);
 
     // The game's way: push each luaopen_* thunk as a C function and lua_call it with the library name.
     uint32_t L2 = LUA(&c, "luaL_newstate");
