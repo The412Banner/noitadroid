@@ -6,9 +6,9 @@
 #
 #   tools/android/setup_fmod.sh [fmodstudioapi201XXandroid.tar.gz]
 #
-# Without an archive, it looks for fmodstudioapi201*android.tar.gz in ~/Downloads, .local-deps, /path/to/downloads and
-# /path/to/temp; when there is none, it signs in to fmod.com with your account (asked for here, sent only to
-# fmod.com, never stored) and downloads 2.01.23. Run that in your own terminal: the password prompt needs one.
+# Without an archive, it looks for fmodstudioapi201*android.tar.gz in ~/Downloads and .local-deps; when there is
+# none, it signs in to fmod.com with your account (asked for here, sent only to fmod.com, never stored) and
+# downloads 2.01.23. Run that in your own terminal: the password prompt needs one.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 VERSION=20123  # 2.01.23
@@ -41,8 +41,7 @@ esc() { local s=${1//\\/\\\\}; printf '%s' "${s//\"/\\\"}"; }  # for a quoted va
 
 archive=${1:-}
 if [ -z "$archive" ]; then
-    archive=$(ls -t ~/Downloads/fmodstudioapi201*android.tar.gz "$DEPS"/fmodstudioapi201*android.tar.gz \
-        /path/to/downloads/fmodstudioapi201*android.tar.gz /path/to/temp/fmodstudioapi201*android.tar.gz 2>/dev/null | head -1) || true
+    archive=$(ls -t ~/Downloads/fmodstudioapi201*android.tar.gz "$DEPS"/fmodstudioapi201*android.tar.gz 2>/dev/null | head -1) || true
 fi
 if [ -z "$archive" ]; then
     archive=$DEPS/fmodstudioapi${VERSION}android.tar.gz
