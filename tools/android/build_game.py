@@ -92,6 +92,64 @@ def compile_one(job):
     return obj, True
 
 
+ICON_DP = 56  # the glyph's height in the 108 dp adaptive icon: inside the 66 dp circle every launcher mask keeps
+
+
+def make_icon(noita_dir: Path) -> bool:
+    """The launcher icon from the game's own window icon (data/icon.bmp, Nolla's pixel-art N): it's the builder's
+    copy of the game, so the repo has none of its art. An adaptive icon in build/android/res (android/app's Gradle
+    build uses it when present): the glyph scaled by nearest neighbour on black, at each density."""
+    import struct
+    import zlib
+
+    try:
+        bmp = (noita_dir / "data/icon.bmp").read_bytes()
+    except OSError:
+        return False
+    offset = struct.unpack_from("<I", bmp, 10)[0]
+    w, h = struct.unpack_from("<ii", bmp, 18)
+    if bmp[:2] != b"BM" or struct.unpack_from("<H", bmp, 28)[0] != 24:
+        return False
+    stride = (w * 3 + 3) & ~3
+
+    def pixel(x: int, y: int) -> bytes:  # RGB; rows are bottom-up when the height is positive, pixels BGR
+        i = offset + (abs(h) - 1 - y if h > 0 else y) * stride + x * 3
+        return bmp[i:i + 3][::-1]
+
+    lit = [(x, y) for y in range(abs(h)) for x in range(w) if sum(pixel(x, y)) > 30]
+    x0, x1 = min(x for x, _ in lit), max(x for x, _ in lit) + 1
+    y0, y1 = min(y for _, y in lit), max(y for _, y in lit) + 1
+
+    def png(size: int) -> bytes:
+        scale = ICON_DP / 108 * size / (y1 - y0)  # output pixels per source pixel
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        rows = bytearray()
+        for oy in range(size):
+            rows.append(0)
+            sy = int(cy + (oy + 0.5 - size / 2) / scale)
+            for ox in range(size):
+                sx = int(cx + (ox + 0.5 - size / 2) / scale)
+                rgb = pixel(sx, sy) if x0 <= sx < x1 and y0 <= sy < y1 else b"\0\0\0"
+                rows += rgb + (b"\xff" if sum(rgb) > 30 else b"\0")
+        chunk = lambda kind, data: struct.pack(">I", len(data)) + kind + data + \
+            struct.pack(">I", zlib.crc32(kind + data))
+        return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)) + \
+            chunk(b"IDAT", zlib.compress(bytes(rows), 9)) + chunk(b"IEND", b"")
+
+    res = OUT / "res"
+    for density, size in (("mdpi", 108), ("hdpi", 162), ("xhdpi", 216), ("xxhdpi", 324), ("xxxhdpi", 432)):
+        (res / f"mipmap-{density}").mkdir(parents=True, exist_ok=True)
+        (res / f"mipmap-{density}/ic_launcher_foreground.png").write_bytes(png(size))
+    (res / "mipmap-anydpi-v26").mkdir(parents=True, exist_ok=True)
+    (res / "mipmap-anydpi-v26/ic_launcher.xml").write_text(
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">\n'
+        '    <background android:drawable="@android:color/black" />\n'
+        '    <foreground android:drawable="@mipmap/ic_launcher_foreground" />\n'
+        '</adaptive-icon>\n')
+    return True
+
+
 def needed(lib: Path) -> list[str]:
     out = subprocess.run([str(target.NDK_BIN / "llvm-readelf"), "-d", str(lib)], capture_output=True, text=True,
                          check=True).stdout
@@ -153,6 +211,8 @@ def main():
           f"{sum(c for _, c in done)} compiled; "
           f"compile {t2 - t1:.0f}s, link {t3 - t2:.0f}s; libmain.so {libmain.stat().st_size / 1e6:.1f} MB")
     print("jniLibs:", ", ".join(stage(libmain)))
+    if not make_icon(Path(os.environ["NOITA_DIR"])):
+        print("no data/icon.bmp in NOITA_DIR: the app gets Android's default icon")
     if args.no_apk:
         return
     subprocess.run(["./gradlew", "-q", "assembleDebug"], cwd=ROOT / "android", check=True)
