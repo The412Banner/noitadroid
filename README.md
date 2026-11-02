@@ -31,8 +31,8 @@ Other devices are untested so far. Reports are welcome.
 
 ## What you need
 
-- **Noita for Windows from GOG**, build `20250125-1640` (Jan 25 2025). Use the offline installer
-  `setup_noita_20250125-1640_(79502).exe` and its `.bin` files. The Steam version won't work: the recompiled code
+- **Noita for Windows from GOG**, build `20250125-1640` (Jan 25 2025). Use its offline installer,
+  `setup_noita_20250125-1640_(79502).exe` (one 1.5 GB file). The Steam version won't work: the recompiled code
   is for this one build.
 - **An Android device:**
   - arm64, Android 10 or later, with OpenGL ES 3.0;
