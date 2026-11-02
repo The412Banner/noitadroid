@@ -11,7 +11,8 @@ recompiled to ARM64, on Android handhelds and phones. It has no emulator and no 
 It plays on an AYANEO Pocket S (Snapdragon G3x Gen 2, Android 13):
 - Fullscreen 1920×1080, with 50–60 fps in the early caves.
 - Full sound (FMOD), and the built-in gamepad and the touchscreen both work.
-- An in-game menu with save export/import, gamepad button swaps, and an FPS and temperature display.
+- An in-game menu with save export/import, gamepad button swaps, performance settings, and an FPS and temperature
+  display.
 
 Other devices are untested so far. Reports are welcome.
 
@@ -25,7 +26,7 @@ You need:
 - **Noita for Windows from GOG**, build `20250125-1640` (Jan 25 2025): its offline installer,
   `setup_noita_20250125-1640_(79502).exe` (one 1.5 GB file). The Steam version won't work: the recompiled code is
   for this one build.
-- **An Android device:** arm64, Android 10 or later, OpenGL ES 3.0. The build needs a lot of memory: 8 GB of RAM or
+- **An Android device:** arm64, Android 11 or later, OpenGL ES 3.0. The build needs a lot of memory: 8 GB of RAM or
   more is recommended (tested with 16 GB). About 5 GB of free storage while installing, 2 GB afterwards. A gamepad is
   recommended.
 - **Optional, for sound:** FMOD Engine **2.01.x** for Android, which you download yourself from
@@ -75,6 +76,9 @@ The APKs are signed with this certificate (SHA-256):
     from Android or Windows; the current save is kept as `save00.backup-<date>`, and the game restarts.
   - **Gamepad buttons.** Swap buttons (say A and B) for the game. The game's own settings can also rebind its
     actions.
+  - **Performance.** Which CPU cores the game's threads run on. By default the game's main thread has the fastest
+    core to itself: 8–16% faster than leaving it to Android, on the Pocket S. **Full speed** also keeps that core
+    from sleeping: 14–25% faster, but hotter. It applies at once.
   - **FPS and temperatures.** A small display at the top of the screen.
   - **Language.** The app's own screens are in English; switch to Chinese here or on the first screen. The game
     has its own language setting.
@@ -89,6 +93,9 @@ The APKs are signed with this certificate (SHA-256):
 - **The build fails.** The first screen shows why; `/sdcard/noitadroid/build.log` has the details. If the device ran
   out of memory, close other apps and build again: it goes on where it stopped.
 - **The first screen says the version is wrong.** Your `noita.exe` isn't GOG build 20250125-1640.
+- **The game slows down in busy places.** Noita is heavy on the CPU, and when it can't keep up it runs slower
+  rather than dropping frames. Check the device's own performance mode (on the Pocket S, AYANEO's game window): a
+  balanced mode caps the clocks. In the in-game menu, Performance settings has a Full speed option.
 - **No sound.** Import FMOD 2.01.x for Android (see above); other versions are refused.
 - **Gamepad trouble.** Put an empty file named `debug_input` in `/sdcard/noitadroid/`. The log then lists the
   gamepads and their axes.
@@ -109,7 +116,7 @@ the program isn't.
 
 ### Will it run on my phone or handheld?
 
-Probably, if it's arm64 with Android 10 or later, OpenGL ES 3.0 and enough memory for the build, but only the
+Probably, if it's arm64 with Android 11 or later, OpenGL ES 3.0 and enough memory for the build, but only the
 AYANEO Pocket S has been tested so far. Noita is heavy on the CPU, so a recent Snapdragon helps. Please open an issue
 with how it went.
 

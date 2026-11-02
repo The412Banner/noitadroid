@@ -25,7 +25,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.zhouwuqi.noitadroid"
-        minSdk = 29
+        minSdk = 30  // all-files access (MANAGE_EXTERNAL_STORAGE), where the game and saves live
         targetSdk = 36
         versionCode = 2
         versionName = "0.2.0"
