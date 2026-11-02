@@ -103,6 +103,7 @@ adb install -r build/android/noitadroid.apk
   - **存档：** 导出成 zip，目录结构和电脑版的 `Nolla_Games_Noita` 文件夹一致；也可以从这样的 zip 导入，Android 和电脑版的都行。当前存档会备份为 `save00.backup-日期`，然后游戏重启。
   - **手柄按键：** 为游戏互换按键，比如 A 和 B。游戏自带的设置里也能改各个操作的键位。
   - **FPS 和温度：** 在屏幕顶部显示一个小信息条。
+  - **语言：** 应用自己的界面默认是英文，可以在这里或首屏切换成中文。游戏本身的语言在游戏设置里改。
 - **设备上的文件：**
   - `/sdcard/noitadroid/Noita/`：游戏。
   - `/sdcard/noitadroid/save/AppData/LocalLow/Nolla_Games_Noita/`：存档，卸载应用后也会保留。

@@ -7,6 +7,7 @@ import static io.github.zhouwuqi.noitadroid.Ui.GOOD;
 import static io.github.zhouwuqi.noitadroid.Ui.TEXT;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.text.format.Formatter;
@@ -49,6 +50,7 @@ final class GameDrawer {
     private static final int MAIN = 0, PAD = 1, PAD_TARGET = 2, IMPORT = 3;
 
     private final Activity a;
+    private Context t;  // for strings: the app's language (Lang), which the menu itself switches
     private final Host host;
     private final PadMap pad;
     private final StatsOverlay stats;
@@ -67,6 +69,7 @@ final class GameDrawer {
 
     GameDrawer(Activity a, FrameLayout parent, Host host, PadMap pad, StatsOverlay stats) {
         this.a = a;
+        t = Lang.wrap(a);
         this.host = host;
         this.pad = pad;
         this.stats = stats;
@@ -215,31 +218,42 @@ final class GameDrawer {
 
     private void renderMain() {
         content.addView(Ui.text(a, "noitadroid", 22, ACCENT, true));
-        content.addView(Ui.text(a, a.getString(R.string.menu_paused), 13, DIM, false));
+        content.addView(Ui.text(a, t.getString(R.string.menu_paused), 13, DIM, false));
 
         section(R.string.menu_saves);
-        hint(a.getString(R.string.menu_saves_hint));
+        hint(t.getString(R.string.menu_saves_hint));
         buttons(button(R.string.menu_export, v -> pickExport()), button(R.string.menu_import, v -> pickImport()));
         if (saveMessage != null) content.addView(Ui.text(a, saveMessage, 13, saveColor, false), Ui.full(0, dp(8), 0, 0));
 
         section(R.string.menu_pad);
         String swaps = pad.summary();
-        hint(swaps.isEmpty() ? a.getString(R.string.menu_pad_default) : a.getString(R.string.menu_pad_swapped, swaps));
+        hint(swaps.isEmpty() ? t.getString(R.string.menu_pad_default) : t.getString(R.string.menu_pad_swapped, swaps));
         buttons(button(R.string.menu_pad_edit, v -> showPad(0)));
 
         section(R.string.menu_display);
         buttons(button(stats.isOn() ? R.string.menu_overlay_on : R.string.menu_overlay_off, v -> {
             stats.setOn(!stats.isOn());
-            ((Button) v).setText(stats.isOn() ? R.string.menu_overlay_on : R.string.menu_overlay_off);
+            ((Button) v).setText(t.getString(stats.isOn() ? R.string.menu_overlay_on : R.string.menu_overlay_off));
         }));
+        Button lang = button(R.string.menu_language, v -> {
+            Lang.set(a, Lang.other(a));
+            t = Lang.wrap(a);
+            render();
+            content.post(() -> {
+                View again = content.findViewWithTag("lang");
+                if (again != null) again.requestFocus();
+            });
+        });
+        lang.setTag("lang");
+        buttons(lang);
 
         Button resume = button(R.string.menu_resume, v -> close());
         content.addView(resume, Ui.full(0, dp(22), 0, 0));
     }
 
     private void renderPad() {
-        content.addView(Ui.text(a, a.getString(R.string.pad_title), 20, ACCENT, true));
-        hint(a.getString(R.string.pad_hint));
+        content.addView(Ui.text(a, t.getString(R.string.pad_title), 20, ACCENT, true));
+        hint(t.getString(R.string.pad_hint));
         for (int i = 0; i < PadMap.KEYS.length; i++) {
             int src = i, t = pad.target(i);
             Button b = button(PadMap.NAMES[i] + "   →   " + PadMap.NAMES[t], v -> showPadTarget(src));
@@ -267,8 +281,8 @@ final class GameDrawer {
     }
 
     private void renderPadTarget() {
-        content.addView(Ui.text(a, a.getString(R.string.pad_choose, PadMap.NAMES[padSource]), 20, ACCENT, true));
-        hint(a.getString(R.string.pad_choose_hint));
+        content.addView(Ui.text(a, t.getString(R.string.pad_choose, PadMap.NAMES[padSource]), 20, ACCENT, true));
+        hint(t.getString(R.string.pad_choose_hint));
         LinearLayout row = null;
         for (int t = 0; t < PadMap.KEYS.length; t++) {
             if (t % 2 == 0) {
@@ -289,14 +303,14 @@ final class GameDrawer {
     }
 
     private void renderImport() {
-        content.addView(Ui.text(a, a.getString(R.string.import_title), 20, ACCENT, true));
+        content.addView(Ui.text(a, t.getString(R.string.import_title), 20, ACCENT, true));
         List<String> what = new ArrayList<>();
-        if (staged.run) what.add(a.getString(R.string.import_has_run));
-        if (staged.progress) what.add(a.getString(R.string.import_has_progress));
-        if (staged.stats) what.add(a.getString(R.string.import_has_stats));
-        hint(a.getString(R.string.import_what, String.join(a.getString(R.string.list_sep), what), staged.files,
+        if (staged.run) what.add(t.getString(R.string.import_has_run));
+        if (staged.progress) what.add(t.getString(R.string.import_has_progress));
+        if (staged.stats) what.add(t.getString(R.string.import_has_stats));
+        hint(t.getString(R.string.import_what, String.join(t.getString(R.string.list_sep), what), staged.files,
                 Formatter.formatFileSize(a, staged.bytes)));
-        content.addView(Ui.text(a, a.getString(R.string.import_warning), 13, TEXT, false), Ui.full(0, dp(10), 0, 0));
+        content.addView(Ui.text(a, t.getString(R.string.import_warning), 13, TEXT, false), Ui.full(0, dp(10), 0, 0));
         buttons(button(R.string.import_go, v -> {
             try {
                 SaveTransfer.requestApply();
@@ -304,7 +318,7 @@ final class GameDrawer {
                 host.restart();
             } catch (java.io.IOException e) {
                 cancelImport();
-                message(a.getString(R.string.import_failed, e.getMessage()), BAD);
+                message(t.getString(R.string.import_failed, e.getMessage()), BAD);
             }
         }), button(R.string.cancel, v -> cancelImport()));
     }
@@ -336,14 +350,14 @@ final class GameDrawer {
         Uri uri = resultCode == Activity.RESULT_OK && data != null ? data.getData() : null;
         if (uri == null) return true;
         busy = true;
-        message(a.getString(requestCode == REQ_EXPORT ? R.string.export_running : R.string.import_reading), DIM);
+        message(t.getString(requestCode == REQ_EXPORT ? R.string.export_running : R.string.import_reading), DIM);
         new Thread(() -> {
             if (requestCode == REQ_EXPORT) {
                 try (OutputStream out = a.getContentResolver().openOutputStream(uri, "w")) {
                     long n = SaveTransfer.export(out);
-                    done(() -> message(a.getString(R.string.export_done, Formatter.formatFileSize(a, n)), GOOD));
+                    done(() -> message(t.getString(R.string.export_done, Formatter.formatFileSize(a, n)), GOOD));
                 } catch (Exception e) {
-                    done(() -> message(a.getString(R.string.export_failed, e.getMessage()), BAD));
+                    done(() -> message(t.getString(R.string.export_failed, e.getMessage()), BAD));
                 }
             } else {
                 try (InputStream in = a.getContentResolver().openInputStream(uri)) {
@@ -354,7 +368,7 @@ final class GameDrawer {
                         show(IMPORT);
                     });
                 } catch (Exception e) {
-                    done(() -> message(a.getString(R.string.import_failed, e.getMessage()), BAD));
+                    done(() -> message(t.getString(R.string.import_failed, e.getMessage()), BAD));
                 }
             }
         }, "noitadroid-saves").start();
@@ -380,7 +394,7 @@ final class GameDrawer {
     // --- views
 
     private void section(int title) {
-        content.addView(Ui.text(a, a.getString(title), 15, TEXT, true), Ui.full(0, dp(18), 0, 0));
+        content.addView(Ui.text(a, t.getString(title), 15, TEXT, true), Ui.full(0, dp(18), 0, 0));
     }
 
     private void hint(String s) {
@@ -388,7 +402,7 @@ final class GameDrawer {
     }
 
     private Button button(int label, View.OnClickListener l) {
-        return Ui.button(a, a.getString(label), l);
+        return Ui.button(a, t.getString(label), l);
     }
 
     private Button button(String label, View.OnClickListener l) {

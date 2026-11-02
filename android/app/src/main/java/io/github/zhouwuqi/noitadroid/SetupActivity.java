@@ -11,6 +11,7 @@ import static io.github.zhouwuqi.noitadroid.Ui.WAIT;
 
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -35,11 +36,18 @@ public class SetupActivity extends Activity {
     private LinearLayout rows;
     private TextView status;
     private Button start, recheck;
+    private boolean resumedBefore;
+
+    /** Its strings in the app's language (Lang: English unless Chinese was picked), not the system's. */
+    @Override
+    protected void attachBaseContext(Context base) {
+        super.attachBaseContext(Lang.wrap(base));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (new GameCheck(this).ready()) {
+        if (savedInstanceState == null && new GameCheck(this).ready()) {  // not when recreated for a language
             startGame();
             return;
         }
@@ -53,10 +61,21 @@ public class SetupActivity extends Activity {
         if (new GameCheck(this).ready()) startGame();
     }
 
+    /**
+     * Back from Android's settings, from copying the game over USB, or from the launcher: into the game when it can
+     * start by now, else the list again. Not on the first resume, after onCreate (shown for a reason: something was
+     * missing, or the language was just switched).
+     */
     @Override
     protected void onResume() {
         super.onResume();
-        if (rows != null && !isFinishing()) show();  // back from Android's settings, or from copying the game over USB
+        if (rows == null || isFinishing()) return;
+        if (resumedBefore && new GameCheck(this).ready()) {
+            startGame();
+            return;
+        }
+        resumedBefore = true;
+        show();
     }
 
     private void startGame() {
@@ -127,7 +146,17 @@ public class SetupActivity extends Activity {
         left.setOrientation(LinearLayout.VERTICAL);
         ImageView icon = new ImageView(this);
         icon.setImageDrawable(getApplicationInfo().loadIcon(getPackageManager()));
-        left.addView(icon, new LinearLayout.LayoutParams(dp(64), dp(64)));
+        LinearLayout top = new LinearLayout(this);  // the icon, and the language switch at the right
+        top.setGravity(Gravity.CENTER_VERTICAL);
+        top.addView(icon, new LinearLayout.LayoutParams(dp(64), dp(64)));
+        top.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
+        Button lang = Ui.button(this, getString(R.string.setup_language), v -> {
+            Lang.set(this, Lang.other(this));
+            recreate();
+        });
+        lang.setSingleLine(true);
+        top.addView(lang);
+        left.addView(top, Ui.full(0, 0, 0, 0));
         left.addView(Ui.text(this, "noitadroid", 28, ACCENT, true), Ui.wrap(0, dp(8), 0, 0));
         left.addView(Ui.text(this, getString(R.string.setup_subtitle), 15, TEXT, false));
         left.addView(Ui.text(this, getString(R.string.setup_intro, GameCheck.GOG_BUILD), 13, DIM, false),

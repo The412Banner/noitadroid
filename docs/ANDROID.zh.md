@@ -124,6 +124,8 @@ FMOD：运行 `tools/android/setup_fmod.sh`。它会先在 `~/Downloads` 和 `.l
 
 首屏引导：启动器入口是 `SetupActivity`。它用 `GameCheck` 检查四项：所有文件访问权限、`/sdcard/noitadroid/Noita` 里的 noita.exe、msvcp120.dll 和 data/data.wak、游戏版本（比对哈希），以及 FMOD 是否在 APK 里。比对的标准是 `build_game.py` 在构建时写进 `assets/noitadroid.properties` 的值：构建者那份游戏里 noita.exe 和 msvcp120.dll 的 sha256、data.wak 的大小、FMOD 版本。必需项都满足时，它直接启动 `NoitaActivity`，不显示任何界面（第一次要算哈希，约 0.1 秒，之后按文件大小和修改时间缓存）。否则显示中英文的检查清单，每项都写明该怎么做，触屏和手柄都能操作，回到前台时会自动重查。拿到权限后它会自动建好 Noita 文件夹，方便通过 USB 拷贝。已在 Pocket S 上测过：一切就绪、没有权限、缺游戏文件、版本不对四种情况，以及手柄 A 键重查。
 
+界面语言（`Lang`）：首屏和游戏内菜单默认英文，不跟随系统语言；两处都能切换成中文，存在 SharedPreferences 里。首屏用 `attachBaseContext` 换语言，菜单用自己的本地化 Context，所以切换后立刻生效，不用重启游戏。首屏只在刚打开或刚切换完语言时停留；之后每次回到前台，如果已经全部就绪就直接进游戏，比如授权回来、从桌面点图标回来。
+
 游戏内菜单（`GameDrawer`）：在游戏中从屏幕左边缘往右滑，会拉出侧边栏。
 - 系统手势导航也用这个边缘做「返回」，所以 `NoitaActivity` 把左边缘中间的 200 dp（Android 允许的最大值）排除在系统手势之外，在这段里滑才能打开。
 - 侧边栏打开时游戏停住：`runtime/gles.c` 包装了 `SDL_GL_SwapWindow`，在帧末尾等待，同时用 FMOD 的 `System::mixerSuspend` 让声音停下。

@@ -8,6 +8,7 @@
     <string name="setup_ready">Everything\'s ready.</string>
     <string name="setup_not_ready">Not ready yet: see the items marked ✕.</string>
     <string name="start">Start Noita</string>
+    <string name="setup_language">中文</string>
     <string name="recheck">Check again</string>
 
     <string name="access_title">Storage access</string>
@@ -44,6 +45,7 @@
     <string name="menu_display">Display</string>
     <string name="menu_overlay_on">FPS and temperatures: on</string>
     <string name="menu_overlay_off">FPS and temperatures: off</string>
+    <string name="menu_language">Language: English</string>
     <string name="menu_resume">Back to the game</string>
     <string name="menu_back">Back</string>
     <string name="cancel">Cancel</string>

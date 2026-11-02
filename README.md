@@ -122,6 +122,8 @@ Once everything is there, the app goes straight into the game.
   - **Gamepad buttons.** Swap buttons (say A and B) for the game. The game's own settings can also rebind its
     actions.
   - **FPS and temperatures.** A small display at the top of the screen.
+  - **Language.** The app's own screens are in English; switch to Chinese here or on the first screen. The game
+    has its own language setting.
 - **Files** on the device:
   - `/sdcard/noitadroid/Noita/`: the game.
   - `/sdcard/noitadroid/save/AppData/LocalLow/Nolla_Games_Noita/`: the saves. Uninstalling keeps them.
