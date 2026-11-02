@@ -1,8 +1,10 @@
 # noitadroid
 
-**在 Android 上原生运行 Noita。** noitadroid 把 Windows 版 Noita 静态重编译成 ARM64，在 Android 掌机和手机上运行，不经过模拟器，也不用 Wine 或 Proton。它基于 [mina4mac](https://github.com/paulstraw/mina4mac)，后者为 Apple Silicon 的 Mac 做了同样的事。
+**在 Android 上原生运行 Noita。** noitadroid 是 Noita 的 Android 原生移植（Noita 安卓版）：把 Windows 版 Noita 静态重编译成 ARM64，在 Android 掌机和手机上运行，不经过模拟器，也不用 Wine 或 Proton。它基于 [mina4mac](https://github.com/paulstraw/mina4mac)，后者为 Apple Silicon 的 Mac 做了同样的事。
 
 [English](README.md)
+
+![Noita 在 AYANEO Pocket S 安卓掌机上原生运行](docs/images/pocket-s.jpg)
 
 在 AYANEO Pocket S（骁龙 G3x Gen 2，Android 13）上已经能玩：
 - 1920×1080 全屏，前期洞穴 50–60 fps。
@@ -109,12 +111,38 @@ adb install -r build/android/noitadroid.apk
   - `/sdcard/noitadroid/save/AppData/LocalLow/Nolla_Games_Noita/`：存档，卸载应用后也会保留。
   - `/sdcard/noitadroid/noitadroid.log`：日志，也可以用 `adb logcat -s noitadroid` 查看。
 
-## 常见问题
+## 故障排查
 
 - **首屏说版本不对：** 你的 `noita.exe` 不是 GOG 的 20250125-1640 版，或者不是构建这个应用时用的那一份。
 - **没有声音：** 应用构建时没加入 FMOD（首屏会提示），或者用的不是 2.01.x。
 - **手柄有问题：** 在 `/sdcard/noitadroid/` 下放一个名为 `debug_input` 的空文件，日志里就会列出手柄和它们的轴。
 - 其他问题：看 `/sdcard/noitadroid/noitadroid.log`，然后提 issue。
+
+## 常见问题（FAQ）
+
+### 有现成的 APK 可以下载吗？
+
+没有，以后也不会有。APK 里有由 Noita 本身转换来的代码和 FMOD 的库，这些都不能分享。每个人都要用自己的游戏自己构建。请不要索要或分享 APK。
+
+### Steam 版能用吗？
+
+不能。重编译出来的代码只对应一个版本的 `noita.exe`，也就是 GOG 的 `20250125-1640`。两个平台的游戏数据一样，但程序不一样。
+
+### 我的手机或掌机能跑吗？
+
+只要是 arm64、Android 10 或更新、支持 OpenGL ES 3.0，大概率可以，但目前只在 AYANEO Pocket S 上测过。Noita 很吃 CPU，较新的骁龙芯片会更好。欢迎提 issue 反馈运行情况。
+
+### 能用 mod 吗？
+
+游戏自己的 Lua mod 机制是能运行的（游戏自带的 mod 就是这样加载的），但其他 mod 在 Android 上还没怎么试过。需要原生 DLL 的 mod 和 Steam 创意工坊都不行。
+
+### 能用电脑上的存档吗？
+
+可以，但要是同一版本的 Noita：把电脑上 `%USERPROFILE%\AppData\LocalLow\Nolla_Games_Noita` 里的 `save00` 文件夹打成 zip，在游戏内菜单里导入；或者直接拷到设备上的存档文件夹。
+
+### 为什么需要「所有文件访问权限」？
+
+这样游戏和存档才能放在共享存储里：可以通过 USB 拷贝，重装应用也不会丢。
 
 ## 开发
 

@@ -1,10 +1,12 @@
 # noitadroid
 
-**Noita on Android, natively.** noitadroid runs the Windows game, statically recompiled to ARM64, on Android
-handhelds and phones. It has no emulator and no Wine or Proton. It's built on
+**Noita on Android, natively.** noitadroid is a native Android port of Noita: the Windows game, statically
+recompiled to ARM64, on Android handhelds and phones. It has no emulator and no Wine or Proton. It's built on
 [mina4mac](https://github.com/paulstraw/mina4mac), which does the same for Apple Silicon Macs.
 
 [中文说明](README.zh-CN.md)
+
+![Noita running natively on an AYANEO Pocket S Android handheld](docs/images/pocket-s.jpg)
 
 It plays on an AYANEO Pocket S (Snapdragon G3x Gen 2, Android 13):
 - Fullscreen 1920×1080, with 50–60 fps in the early caves.
@@ -137,6 +139,37 @@ Once everything is there, the app goes straight into the game.
 - **Gamepad trouble.** Put an empty file named `debug_input` in `/sdcard/noitadroid/`. The log then lists the
   gamepads and their axes.
 - Anything else: look at `/sdcard/noitadroid/noitadroid.log` and open an issue.
+
+## FAQ
+
+### Is there an APK to download?
+
+No, and there won't be. The APK holds code made from Noita itself and FMOD's libraries, which can't be shared.
+Everyone builds their own from their own copy of the game. Please don't ask for, or share, APKs.
+
+### Does the Steam version work?
+
+No. The recompiled code is for one build of `noita.exe`: GOG's `20250125-1640`. The game's data is the same, but
+the program isn't.
+
+### Will it run on my phone or handheld?
+
+Probably, if it's arm64 with Android 10 or later and OpenGL ES 3.0, but only the AYANEO Pocket S has been tested
+so far. Noita is heavy on the CPU, so a recent Snapdragon helps. Please open an issue with how it went.
+
+### Do mods work?
+
+The game's own Lua mod support runs (it loads its built-in mods that way), but other mods haven't been tried much
+on Android yet. Mods that need native DLLs, or the Steam Workshop, won't work.
+
+### Can I use my PC save?
+
+Yes, from the same version of Noita: zip the `save00` folder from `%USERPROFILE%\AppData\LocalLow\Nolla_Games_Noita` and import it from the in-game
+menu, or copy it into the save folder on the device.
+
+### Why does it need "All files access"?
+
+So the game and saves can live in shared storage, where you copy them over USB and where they survive a reinstall.
 
 ## Development
 
