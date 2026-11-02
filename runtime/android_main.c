@@ -176,10 +176,12 @@ int SDL_main(int argc, char *argv[]) {
         __android_log_write(ANDROID_LOG_WARN, "noitadroid", "SDL_main again in the same process: exiting");
         exit(0);
     }
-    // NoitaActivity.getArguments(): "--home <dir> --fmod-dir <dir>", then the game's own
-    const char *home = NULL, *fmod = NULL;
+    // NoitaActivity.getArguments(): "--home <dir> --game <dir> --fmod-dir <dir>", then the game's own. The game
+    // folder is <home>/Noita unless the user chose another (a copy on a memory card, say).
+    const char *home = NULL, *fmod = NULL, *game = NULL;
     while (argc >= 3 && !strncmp(argv[1], "--", 2)) {
         if (!strcmp(argv[1], "--home")) home = argv[2];
+        else if (!strcmp(argv[1], "--game")) game = argv[2];
         else if (!strcmp(argv[1], "--fmod-dir")) fmod = argv[2];
         argv[2] = argv[0];
         argc -= 2, argv += 2;
@@ -190,6 +192,7 @@ int SDL_main(int argc, char *argv[]) {
     char path[1024];
     snprintf(path, sizeof path, "%s/noitadroid.log", home);
     redirect_stdio(path);
+    if (game && *game && !getenv("NOITA_DIR")) setenv("NOITA_DIR", game, 1);
     env_default("NOITA_DIR", home, "Noita");
     env_default("MINA4MAC_DATA", home, "save");
     if (fmod && *fmod && !getenv("MINA4MAC_FMOD")) setenv("MINA4MAC_FMOD", fmod, 1);

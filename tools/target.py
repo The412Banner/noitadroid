@@ -6,6 +6,10 @@ NOITADROID_TARGET picks it:
   android  the NDK's clang for arm64 (see docs/ANDROID.zh.md)
 Default: mac on macOS, linux elsewhere.
 
+On the device itself (tools/android/device_build.py, run by the app) NOITADROID_TOOLCHAIN names the app's native
+library directory (libnd_llvm.so, libnd_ld.so, libSDL2.so) and NOITADROID_TOOLCHAIN_DATA the toolchain's extracted
+assets (clang's headers, the sysroot): the android target then builds with those (tools/android/build_toolchain.py).
+
 On Linux and Android runtime/compat/compat.h is force-included and runtime/compat/ is searched first: it stands in
 for the Darwin headers. The runtime's own directories go on the quote path there (-iquote), because
 runtime/sched.h would otherwise shadow the <sched.h> that glibc's <pthread.h> includes.
@@ -28,13 +32,35 @@ DEPS = ROOT / ".local-deps"
 NDK = Path(os.environ.get("ANDROID_NDK_HOME") or DEPS / "ndk")
 ANDROID_API = 29
 NDK_BIN = NDK / "toolchains/llvm/prebuilt/linux-x86_64/bin"
+TOOLCHAIN = os.environ.get("NOITADROID_TOOLCHAIN")  # on the device: the app's native library directory
+TOOLCHAIN_DATA = os.environ.get("NOITADROID_TOOLCHAIN_DATA")
+ON_DEVICE = bool(TOOLCHAIN)
+if ON_DEVICE and (NAME != "android" or not TOOLCHAIN_DATA):
+    sys.exit("NOITADROID_TOOLCHAIN needs NOITADROID_TARGET=android and NOITADROID_TOOLCHAIN_DATA")
+
+
+def _device_clang() -> list[str]:
+    """The app's clang (LLVM's multicall binary), with its headers where the app extracted them."""
+    return [f"{TOOLCHAIN}/libnd_llvm.so", "clang", "-resource-dir", f"{TOOLCHAIN_DATA}/clang"]
 
 
 def cc() -> list[str]:
     """The C compiler and its target flags. ARMv8.2 + RCpc gives the TSO-ordered accesses (cpu.h) LDAPR."""
     if NAME == "android":
-        return [str(NDK_BIN / "clang"), f"--target=aarch64-linux-android{ANDROID_API}", "-march=armv8.2-a+rcpc"]
+        clang = [*_device_clang(), f"--sysroot={TOOLCHAIN_DATA}/sysroot"] if ON_DEVICE else [str(NDK_BIN / "clang")]
+        return [*clang, f"--target=aarch64-linux-android{ANDROID_API}", "-march=armv8.2-a+rcpc"]
     return ["clang"]
+
+
+def guest_cc() -> list[str]:
+    """A clang for the guest's (32-bit Windows) layouts: tools/gen_sdl.py adds the target."""
+    return _device_clang() if ON_DEVICE else ["clang"]
+
+
+def nm() -> list[str]:
+    if ON_DEVICE:
+        return [f"{TOOLCHAIN}/libnd_llvm.so", "nm"]
+    return [str(NDK_BIN / "llvm-nm")] if NAME == "android" else ["nm"]
 
 
 def platform_cflags() -> list[str]:
@@ -53,6 +79,8 @@ def test_cflags() -> list[str]:
 
 
 def linker() -> list[str]:
+    if ON_DEVICE:  # clang's driver runs its linker by path: the app's lld, under a name that works (libnd_ld.so)
+        return ["-fuse-ld=lld", f"--ld-path={TOOLCHAIN}/libnd_ld.so"]
     return [] if APPLE else ["-fuse-ld=lld"]
 
 
@@ -89,8 +117,7 @@ def gl_provided_names() -> set[str] | None:
     lib = gl4es_lib()
     if lib is None:
         return None
-    nm = str(NDK_BIN / "llvm-nm") if NAME == "android" else "nm"
-    out = subprocess.run([nm, "--defined-only", str(lib)], capture_output=True, text=True, check=True).stdout
+    out = subprocess.run([*nm(), "--defined-only", str(lib)], capture_output=True, text=True, check=True).stdout
     return {line.split()[-1] for line in out.splitlines() if " T gl" in line}
 
 
@@ -132,7 +159,9 @@ def sdl_cflags() -> list[str]:
 
 
 def sdl_libs() -> list[str]:
-    return [f"-L{DEPS / 'build/SDL2'}", "-lSDL2"] if NAME == "android" else _sdl2_config("--libs")
+    if NAME == "android":  # on the device, the APK's own libSDL2.so
+        return [f"-L{TOOLCHAIN if ON_DEVICE else DEPS / 'build/SDL2'}", "-lSDL2"]
+    return _sdl2_config("--libs")
 
 
 def sdl_include() -> str:

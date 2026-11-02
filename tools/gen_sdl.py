@@ -65,7 +65,7 @@ def clang(args, src, guest):
     stub.write_text("")
     # The host side's layouts come from the target's compiler (Android: arm64); the guest's from any clang.
     extra = [*GUEST, "-include", str(work / "guest_config.h"), "-I", str(work / "guest_inc")] if guest else []
-    p = subprocess.run([*(["clang"] if guest else target.cc()), *extra, "-I", sdl_include(), *args, str(work / "probe.c")],
+    p = subprocess.run([*(target.guest_cc() if guest else target.cc()), *extra, "-I", sdl_include(), *args, str(work / "probe.c")],
                        capture_output=True, text=True)
     if p.returncode:
         sys.exit(f"clang failed:\n{p.stderr[:2000]}")

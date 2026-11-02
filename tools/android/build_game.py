@@ -93,6 +93,20 @@ def compile_one(job):
     return obj, True
 
 
+def link(objs, luajit: Path, out: Path, lto: list[str]):
+    """libmain.so from the objects, LuaJIT, gl4es and SDL2 (also tools/android/device_build.py's link). It exports
+    SDL_main, which SDL's Java side looks up, and NoitaActivity's natives."""
+    exports = OUT / "exports.map"
+    exports.write_text("{ global: SDL_main; Java_io_github_zhouwuqi_noitadroid_*; local: *; };\n")
+    cmd = [*target.cc(), "-shared", *target.linker(), *lto]
+    if lto:
+        (OUT / "lto_cache").mkdir(exist_ok=True)
+        cmd += target.lto_cache(OUT / "lto_cache")
+    subprocess.run([*cmd, *map(str, objs), str(luajit), *target.gl_libs(), *target.sdl_libs(), *target.gl_wrap_flags(),
+                    *target.sys_libs(), f"-Wl,--version-script={exports}", "-Wl,--gc-sections", "-Wl,--no-undefined",
+                    "-Wl,-z,max-page-size=16384", "-o", str(out)], check=True)
+
+
 def write_build_info(noita_dir: Path, fmod_staged: bool):
     """assets/noitadroid.properties: what the app's SetupActivity (GameCheck) compares the game files on the device
     with. The recompiled code is for the noita.exe and msvcp120.dll of this build's game, so their hashes; data.wak's
@@ -213,16 +227,8 @@ def main():
     objs = [o for o, _ in done]
     t2 = time.time()
 
-    exports = OUT / "exports.map"  # SDL_main, which SDL's Java side looks up, and NoitaActivity's natives
-    exports.write_text("{ global: SDL_main; Java_io_github_zhouwuqi_noitadroid_*; local: *; };\n")
     libmain = JNI / "libmain.so"
-    link = [*target.cc(), "-shared", *target.linker(), *lto]
-    if lto:
-        (OUT / "lto_cache").mkdir(exist_ok=True)
-        link += target.lto_cache(OUT / "lto_cache")
-    subprocess.run([*link, *map(str, objs), str(luajit), *target.gl_libs(), *target.sdl_libs(), *target.gl_wrap_flags(),
-                    *target.sys_libs(), f"-Wl,--version-script={exports}", "-Wl,--gc-sections", "-Wl,--no-undefined",
-                    "-Wl,-z,max-page-size=16384", "-o", str(libmain)], check=True)
+    link(objs, luajit, libmain, lto)
     t3 = time.time()
     print(f"bridges: SDL {n_sdl} thunks, GL {n_gl} generated of {len(bridged)}; {len(srcs)} sources, "
           f"{sum(c for _, c in done)} compiled; "
