@@ -118,7 +118,7 @@ adb logcat -s noitadroid                     # 也会写到 /sdcard/noitadroid/n
 - 每次启动都把 `save_shared/config.xml` 改成和屏幕一样大的全屏，因为游戏默认是 1280×720 窗口模式，在 Android 上只会画在屏幕左下角；
 - 同一进程里第二次进入 `SDL_main` 时直接退出进程：来宾内存和 gl4es 不能在一个进程里初始化两次，冒烟测试里出现过 FBO 不完整和地址被占用。
 
-`libmain.so` 只导出 `SDL_main`。`build_game.py` 是增量构建：只改了运行时的一个文件时约 1 分钟，其中重编 1 个文件、链接约 20 秒。
+`libmain.so` 只导出 `SDL_main` 和 `NoitaActivity` 的两个 JNI 函数（帧计数、暂停）。`build_game.py` 是增量构建：只改了运行时的一个文件时约 1 分钟，其中重编 1 个文件、链接约 20 秒。
 
 FMOD：运行 `tools/android/setup_fmod.sh`。它会先在 `~/Downloads` 和 `.local-deps` 里找 `fmodstudioapi201*android.tar.gz`；找不到就在终端里询问 fmod.com 账号密码，登录后下载 2.01.23 的 Android 包。账号密码只发给 fmod.com，不会保存。之后它会检查版本必须是 2.01.x，再解压到 `.local-deps/fmod/`，使 `api/core/lib/arm64-v8a/libfmod.so`、`api/studio/lib/arm64-v8a/libfmodstudio.so` 和 `api/core/lib/fmod.jar` 就位。然后 `build_game.py` 会把它们打进 APK。没有 FMOD 时游戏静音运行。FMOD 的库由 `NoitaActivity.getLibraries()` 在 Java 端加载，因为 libfmod.so 要在 `JNI_OnLoad` 里拿到 Java VM，才能向 `org.fmod.FMOD` 查询音频输出。之后 `runtime/fmod.c` 再 dlopen 同一份库，按句柄查找符号，因为 Android 的 `RTLD_DEFAULT` 会跳过 Java 加载的 RTLD_LOCAL 库。已在 Pocket S 上验证：2.01.23 正常工作，走 AAudio 低延迟 MMAP 输出。
 
