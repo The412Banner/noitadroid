@@ -73,7 +73,7 @@ def gl_header_dir() -> Path:
         return Path(sdk) / "System/Library/Frameworks/OpenGL.framework/Headers"
     if NAME == "linux":
         return Path("/usr/include/GL")
-    return DEPS / "gl4es/include/GL"
+    return DEPS / "src/gl4es/include/GL"
 
 
 def gl_libs() -> list[str]:
@@ -81,7 +81,8 @@ def gl_libs() -> list[str]:
         return ["-framework", "OpenGL"]
     if NAME == "linux":
         return ["-lGL"]
-    return [f"-L{DEPS / 'gl4es/lib'}", "-lGL", "-lGLESv3", "-lEGL"]
+    # gl4es is static; GLES3 directly for what it lacks (sync objects, runtime/compat/OpenGL/glext.h)
+    return [str(DEPS / "build/gl4es/obj/local/arm64-v8a/libGL.a"), "-lGLESv3", "-lEGL"]
 
 
 def sys_libs() -> list[str]:
@@ -93,11 +94,11 @@ def _sdl2_config(flag) -> list[str]:
 
 
 def sdl_cflags() -> list[str]:
-    return [f"-I{DEPS / 'SDL2/include'}"] if NAME == "android" else _sdl2_config("--cflags")
+    return [f"-I{DEPS / 'src/SDL2/include'}"] if NAME == "android" else _sdl2_config("--cflags")
 
 
 def sdl_libs() -> list[str]:
-    return [f"-L{DEPS / 'SDL2/lib'}", "-lSDL2"] if NAME == "android" else _sdl2_config("--libs")
+    return [f"-L{DEPS / 'build/SDL2'}", "-lSDL2"] if NAME == "android" else _sdl2_config("--libs")
 
 
 def sdl_include() -> str:
@@ -112,7 +113,8 @@ def luajit_make() -> list[str]:
     if NAME == "linux":
         return []
     ndk_cc = str(NDK_BIN / f"aarch64-linux-android{ANDROID_API}-clang")
-    return ["HOST_CC=gcc", f"CROSS={NDK_BIN}/llvm-", f"STATIC_CC={ndk_cc}", f"DYNAMIC_CC={ndk_cc} -fPIC",
+    # PIC throughout: the static library ends up inside libmain.so
+    return ["HOST_CC=gcc", f"CROSS={NDK_BIN}/llvm-", f"STATIC_CC={ndk_cc} -fPIC", f"DYNAMIC_CC={ndk_cc} -fPIC",
             f"TARGET_LD={ndk_cc}", f"TARGET_AR={NDK_BIN}/llvm-ar rcus", f"TARGET_STRIP={NDK_BIN}/llvm-strip",
             "TARGET_SYS=Linux"]
 

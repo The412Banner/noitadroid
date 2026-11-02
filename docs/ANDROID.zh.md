@@ -29,8 +29,8 @@ APK
 | 阶段 | 内容 | 需要游戏文件 | 状态 |
 |---|---|---|---|
 | 0 | 平台兼容层 `runtime/compat/` | 否 | 完成（2026-11-02） |
-| 1 | Linux 宿主构建（x86_64，在开发机上）：`build_all.py` 按目标切换编译器和链接参数；`gen_gl`/`gen_sdl` 改为对着 Linux 头文件生成；用 Xvfb + Mesa 跑通，再做 GL 调用调查（`tools/glsurvey.py`） | 是 | 未开始 |
-| 2 | Android 构建：NDK、SDL2 Android、gl4es（加 GLES3 同步对象）、FMOD Android、路径和已知文件夹、Gradle 打包 APK | 是 | 未开始 |
+| 1 | Linux 宿主构建（x86_64，在开发机上）：`build_all.py` 按目标切换编译器和链接参数；`gen_gl`/`gen_sdl` 改为对着 Linux 头文件生成；用 Xvfb + Mesa 跑通，再做 GL 调用调查（`tools/glsurvey.py`） | 是 | 构建配置已完成（`tools/target.py`），hosttest 和 luatest 在 Linux 上通过；等游戏文件 |
+| 2 | Android 构建：NDK、SDL2 Android、gl4es（加 GLES3 同步对象）、FMOD Android、路径和已知文件夹、Gradle 打包 APK | 是 | 依赖（`tools/android/deps.sh`）、Gradle 工程（`android/`）和冒烟测试 APK 已完成，等真机结果 |
 | 3 | Pocket S 调优：主线程和工作线程放到大核（X3 + A715）上（`sched.c`）、温控、帧率上限、手柄、分辨率 | 是 | 未开始 |
 
 第 1 阶段是为了降低风险：开发机上就能把整个游戏跑起来调试，不依赖真机，并在那里先拿到 Noita 实际用到的 GL 调用和着色器清单，再决定 Android 上用 gl4es 还是 Zink。
@@ -63,6 +63,26 @@ NDK=$ANDROID_HOME/ndk/29.0.14206865
 COMPAT="-include runtime/compat/compat.h -I runtime/compat -iquote runtime -I third_party/luajit/src"
 $NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/clang --target=aarch64-linux-android29 -fsyntax-only $COMPAT runtime/heap.c
 ```
+
+## 设备测试（不需要游戏文件）
+
+两组测试都在 4TB 盘上的工程目录里构建，`adb` 在 `/opt/android-sdk/platform-tools/`。
+
+```sh
+# 1. adb shell 里跑的运行时测试：来宾内存、调用约定、LuaJIT 的 arm64 JIT、mod 沙盒
+tools/android/build_tests.sh
+adb push build/android/hosttest build/android/luatest /data/local/tmp/
+adb shell 'cd /data/local/tmp && ./hosttest | tail -1; ./luatest | tail -1'
+
+# 2. App 进程里的冒烟测试（SELinux 的 App 域、ART 的地址空间）：来宾内存、LuaJIT、SDL2 的 GLES3 上下文、
+#    gl4es 的桌面 GL 2.1（立即模式、GLSL 1.20 内置变量、FBO、glMapBuffer）、GLES3 同步对象
+tools/android/build_smoke.sh
+adb install -r build/android/noitadroid-smoke.apk
+#    打开「Noita (noitadroid)」：每一项检查是一条色带，绿色通过、红色失败；点屏幕退出
+adb shell cat /sdcard/Android/data/io.github.zhouwuqi.noitadroid/files/smoke.txt
+```
+
+gl4es 会把命令攒成批次再提交，所以在 GLES3 的 fence 之前要先 `glFlush`（`smoke.c` 里这样做了；GL 桥里也要这样做）。
 
 ## 需要你准备的
 

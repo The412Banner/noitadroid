@@ -45,7 +45,8 @@ LAUNCHER = ("main.c", "heap.c", "proc.c", "msvcr120.c", "msvcr120_stdio.c", "msv
 SDL = ("sdl2.c",)  # runtime files of the SDL2 bridge (launcher only; compiled with the host SDL2's flags)
 LUA = ("lua51.c",)  # the LuaJIT bridge (launcher only; compiled with LUA_CFLAGS, linked with LUAJIT_LIB)
 LUAJIT_SRC = ROOT / "third_party/luajit"
-LUAJIT_BUILD = ROOT / "build/luajit"  # a copy of the submodule, built in place, so the submodule stays clean
+# A copy of the submodule, built in place, so the submodule stays clean. Android's sits apart from the host's.
+LUAJIT_BUILD = ROOT / ("build/android/luajit" if target.NAME == "android" else "build/luajit")
 LUAJIT_LIB = LUAJIT_BUILD / "src/libluajit.a"
 # Lua errors unwind through the bridge (external unwinding), which restores guest state in cleanups.
 LUA_CFLAGS = ["-I", str(LUAJIT_SRC / "src"), "-fexceptions"]
