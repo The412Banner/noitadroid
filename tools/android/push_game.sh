@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Copies your Noita (GOG 20250125-1640) to the device, where the APK's launcher reads it:
-#   /sdcard/Android/data/io.github.zhouwuqi.noitadroid/files/Noita
+# Copies your Noita (GOG 20250125-1640) to the device, where the APK's launcher reads it (runtime/android_main.c):
+#   /sdcard/noitadroid/Noita
+# and gives the app the all-files access it reads shared storage with.
 # Only what the launcher needs: the two binaries it maps (noita.exe, msvcp120.dll; the other DLLs are stood in for
 # by the runtime), data/, mods/ and the files tools/setup_game.sh copies.
 #   tools/android/push_game.sh [game dir] [--force]   (default: $NOITA_DIR, else .local-deps/noita-gog)
@@ -9,7 +10,8 @@ cd "$(dirname "$0")/../.."
 force=0 src=
 for a in "$@"; do [ "$a" = --force ] && force=1 || src=$a; done
 SRC=${src:-${NOITA_DIR:-.local-deps/noita-gog}}
-DST=/sdcard/Android/data/io.github.zhouwuqi.noitadroid/files/Noita
+PKG=io.github.zhouwuqi.noitadroid
+DST=/sdcard/noitadroid/Noita
 ADB=${ADB:-$(command -v adb || echo /opt/android-sdk/platform-tools/adb)}
 [ -f "$SRC/noita.exe" ] && [ -f "$SRC/data/data.wak" ] || { echo "no Noita install at $SRC"; exit 1; }
 [ "$(sha256sum "$SRC/noita.exe" | cut -d' ' -f1)" = f0f5ffd1c64558663ac7cffaf689f4899732a56494c3530b806bf3357d094363 ] \
@@ -30,3 +32,6 @@ else
     tar -C "$SRC" -cf - "${files[@]}" | "$ADB" exec-in "mkdir -p $DST && tar -xf - -C $DST"
 fi
 "$ADB" shell du -sh "$DST"
+"$ADB" shell appops set --uid $PKG MANAGE_EXTERNAL_STORAGE allow 2>/dev/null \
+    && echo "all-files access: $("$ADB" shell appops get --uid $PKG MANAGE_EXTERNAL_STORAGE)" \
+    || echo "install the APK, then grant it all-files access (Settings, or run this again)"

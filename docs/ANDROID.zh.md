@@ -30,7 +30,7 @@ APK
 |---|---|---|---|
 | 0 | 平台兼容层 `runtime/compat/` | 否 | 完成（2026-11-02） |
 | 1 | Linux 宿主构建（x86_64，在开发机上）：`build_all.py` 按目标切换编译器和链接参数；`gen_gl`/`gen_sdl` 改为对着 Linux 头文件生成；用 Xvfb + Mesa 跑通，再做 GL 调用调查（`tools/glsurvey.py`） | 是 | **能玩**（2026-11-02）：重编译 100,129 个函数，主菜单和开新局都正常，gl4es 在 llvmpipe 上约 36 fps；待查：`GL_PIXEL_PACK_BUFFER` |
-| 2 | Android 构建：NDK、SDL2 Android、gl4es（加 GLES3 同步对象）、FMOD Android、路径和已知文件夹、Gradle 打包 APK | 是 | **APK 已构建**（`tools/android/build_game.py`，libmain.so 72 MB）；还没在真机上跑；缺 FMOD（静音） |
+| 2 | Android 构建：NDK、SDL2 Android、gl4es（加 GLES3 同步对象）、FMOD Android、路径和已知文件夹、Gradle 打包 APK | 是 | **在 Pocket S 上能玩**（2026-11-02）：全屏 1920×1080，开局后 15 秒内进入世界，洞穴里 50–57 fps（60 Hz 屏），手柄和触屏都能用；缺 FMOD（静音） |
 | 3 | Pocket S 调优：主线程和工作线程放到大核（X3 + A715）上（`sched.c`）、温控、帧率上限、手柄、分辨率 | 是 | 未开始 |
 
 第 1 阶段是为了降低风险：开发机上就能把整个游戏跑起来调试，不依赖真机，并在那里先拿到 Noita 实际用到的 GL 调用和着色器清单，再决定 Android 上用 gl4es 还是 Zink。
@@ -106,12 +106,19 @@ tools/android/push_game.sh                   # 约 1.5 GB：noita.exe、msvcp120
 adb logcat -s noitadroid                     # 也会写到 /sdcard/Android/data/io.github.zhouwuqi.noitadroid/files/noitadroid.log
 ```
 
-设备上的目录都在 `/sdcard/Android/data/io.github.zhouwuqi.noitadroid/files/` 下：
+设备上的目录都在 `/sdcard/noitadroid/` 下（共享存储，App 需要「所有文件访问权限」，`push_game.sh` 会用 `appops` 授予）：
 - `Noita/`：游戏文件；
-- `save/`：存档，在 `AppData/LocalLow/Nolla_Games_Noita` 里；
+- `save/`：存档（在 `AppData/LocalLow/Nolla_Games_Noita` 里，卸载 App 也不会被删）；
 - `noitadroid.log`：运行时日志。
 
-入口是 `runtime/android_main.c`，`runtime/main.c` 编译时改名成 `noitadroid_main`。`libmain.so` 只导出 `SDL_main`。
+为什么不放在 App 自己的目录（`Android/data/<包名>/files`）：在 Android 13 上，adb shell 拷进去的目录归 shell 所有，权限是 `drwxrws---`，App 读不了；`run-as` 又进不了 `/sdcard`。
+
+`runtime/android_main.c` 做的事：
+- 实现 SDL 调用的入口 `SDL_main`，再去调 `runtime/main.c`；后者编译时被改名为 `noitadroid_main`；
+- 每次启动都把 `save_shared/config.xml` 改成和屏幕一样大的全屏，因为游戏默认是 1280×720 窗口模式，在 Android 上只会画在屏幕左下角；
+- 同一进程里第二次进入 `SDL_main` 时直接退出进程：来宾内存和 gl4es 不能在一个进程里初始化两次，冒烟测试里出现过 FBO 不完整和地址被占用。
+
+`libmain.so` 只导出 `SDL_main`。`build_game.py` 是增量构建：只改了运行时的一个文件时约 1 分钟，其中重编 1 个文件、链接约 20 秒。
 
 FMOD：从 fmod.com 下载 FMOD Engine 2.01.x 的 Android 包，把包里的内容解压到 `.local-deps/fmod/`，使 `api/core/lib/arm64-v8a/libfmod.so`、`api/studio/lib/arm64-v8a/libfmodstudio.so` 和 `api/core/lib/fmod.jar` 都在对应位置。之后 `build_game.py` 会把它们打进 APK。没有 FMOD 时游戏静音运行。
 

@@ -3,7 +3,8 @@ LuaJIT and gl4es), SDL2 and, when .local-deps/fmod has them, FMOD's libraries.
 
 The recompiled C of the last host build (tools/build_all.py: build/<module>/gen/chunk*.c, build/gen_all/table.c and
 decls.h) doesn't depend on the target, so it's reused. The SDL2 and GL bridges are generated again for Android in
-build/android/gen (SDL's arm64 layouts, gl4es's functions); objects go in build/android/obj.
+build/android/gen (SDL's arm64 layouts, gl4es's functions); objects go in build/android/obj and are rebuilt when
+their source, a header, the build scripts or the flags changed.
 
   NOITA_DIR=<GOG install> uv run tools/android/build_game.py [--lto off] [--no-apk]
 """
@@ -49,8 +50,36 @@ def obj_of(src: Path) -> Path:
     return OBJ / f"{src.stem}.o"
 
 
+def deps_mtime(flags: str) -> float:
+    """The newest of what every object depends on besides its source (inf when the flags changed: rebuild all)."""
+    stamp = OBJ / "flags.txt"
+    if not stamp.exists() or stamp.read_text() != flags:
+        stamp.write_text(flags)
+        return float("inf")
+    deps = [*(ROOT / "runtime").glob("*.h"), *(ROOT / "runtime/compat").rglob("*.h"), *GEN.glob("*.h"),
+            *HOST_GEN.glob("*.h"), ROOT / "tools/target.py", Path(__file__)]
+    return max(d.stat().st_mtime for d in deps)
+
+
+def generate_bridges():
+    """The bridges into build/android/gen, replacing a file only when it changed (so its users stay up to date)."""
+    new = OUT / "gen.new"
+    new.mkdir(exist_ok=True)
+    gen_sdl.GEN = gen_gl.GEN = new
+    n_sdl, _ = gen_sdl.generate()
+    _, bridged, n_gl = gen_gl.generate()
+    for f in new.iterdir():
+        old = GEN / f.name
+        if not old.exists() or old.read_bytes() != f.read_bytes():
+            f.replace(old)
+    return n_sdl, bridged, n_gl
+
+
 def compile_one(job):
-    src, lto = job
+    src, lto, newer_than = job
+    obj = obj_of(src)
+    if obj.exists() and obj.stat().st_mtime >= max(src.stat().st_mtime, newer_than):
+        return obj, False
     flags = [*target.cc(), "-c", "-O2", "-ffp-contract=off", "-fno-strict-aliasing", "-w", "-fPIC", *lto,
              *target.platform_cflags(), *target.gl_cflags(), *target.runtime_includes(ROOT / "runtime", GEN, HOST_GEN)]
     if (src.stem.startswith("sdl2") and src.stem != "sdl2_stdlib") or src.name in SDL_USERS:
@@ -59,9 +88,8 @@ def compile_one(job):
         flags += build_all.LUA_CFLAGS
     if src.name == "main.c":
         flags.append("-Dmain=noitadroid_main")  # runtime/android_main.c's SDL_main calls it
-    obj = obj_of(src)
     subprocess.run([*flags, str(src), "-o", str(obj)], check=True)
-    return obj
+    return obj, True
 
 
 def needed(lib: Path) -> list[str]:
@@ -99,15 +127,15 @@ def main():
     for d in (GEN, OBJ, JNI):
         d.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
-    gen_sdl.GEN = gen_gl.GEN = GEN
-    n_sdl, _ = gen_sdl.generate()
-    _, bridged, n_gl = gen_gl.generate()
+    n_sdl, bridged, n_gl = generate_bridges()
     luajit = build_all.build_luajit()
     lto = [f"-flto={args.lto}"] if args.lto != "off" else []
     srcs = sources()
+    newer_than = deps_mtime(" ".join([*target.cc(), *lto]))
     t1 = time.time()
     with mp.Pool(os.cpu_count()) as pool:
-        objs = pool.map(compile_one, [(s, lto) for s in srcs])
+        done = pool.map(compile_one, [(s, lto, newer_than) for s in srcs])
+    objs = [o for o, _ in done]
     t2 = time.time()
 
     exports = OUT / "exports.map"  # only SDL_main: SDL's Java side looks it up; everything else stays local
@@ -121,7 +149,8 @@ def main():
                     *target.sys_libs(), f"-Wl,--version-script={exports}", "-Wl,--gc-sections", "-Wl,--no-undefined",
                     "-Wl,-z,max-page-size=16384", "-o", str(libmain)], check=True)
     t3 = time.time()
-    print(f"bridges: SDL {n_sdl} thunks, GL {n_gl} generated of {len(bridged)}; {len(srcs)} sources; "
+    print(f"bridges: SDL {n_sdl} thunks, GL {n_gl} generated of {len(bridged)}; {len(srcs)} sources, "
+          f"{sum(c for _, c in done)} compiled; "
           f"compile {t2 - t1:.0f}s, link {t3 - t2:.0f}s; libmain.so {libmain.stat().st_size / 1e6:.1f} MB")
     print("jniLibs:", ", ".join(stage(libmain)))
     if args.no_apk:

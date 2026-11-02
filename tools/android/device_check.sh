@@ -38,10 +38,11 @@ if [ "$from" -le 3 ]; then
     echo "== 3. game"
     "$ADB" install -r build/android/noitadroid.apk >/dev/null
     tools/android/push_game.sh
+    "$ADB" shell am force-stop $PKG
     "$ADB" logcat -c
     "$ADB" shell am start -W -n $PKG/.NoitaActivity >/dev/null
     sleep 60
     "$ADB" exec-out screencap -p > build/android/device_60s.png && echo "screenshot: build/android/device_60s.png"
-    "$ADB" shell cat "$FILES/noitadroid.log" | tail -40
+    "$ADB" shell cat /sdcard/noitadroid/noitadroid.log | tail -40
     "$ADB" logcat -d -s noitadroid DEBUG libc AndroidRuntime | grep -E -i 'fatal|signal|abort|backtrace|crash' | head -20 || true
 fi
