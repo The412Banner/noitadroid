@@ -18,6 +18,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include "sched.h"
+
 int noitadroid_main(int argc, char **argv);
 void noitadroid_hold(int on, int after);  // runtime/gles.c
 extern uint64_t noitadroid_frames;
@@ -29,6 +31,12 @@ JNIEXPORT jlong JNICALL Java_io_github_zhouwuqi_noitadroid_NoitaActivity_nativeF
 JNIEXPORT void JNICALL Java_io_github_zhouwuqi_noitadroid_NoitaActivity_nativeHold(JNIEnv *env, jclass cls,
                                                                                      jboolean on, jint after) {
     noitadroid_hold(on, after);
+}
+// Its performance settings: which cores the game's threads run on (runtime/sched.c), from now on.
+JNIEXPORT void JNICALL Java_io_github_zhouwuqi_noitadroid_NoitaActivity_nativeSetCores(JNIEnv *env, jclass cls,
+                                                                                         jstring mode) {
+    const char *m = (*env)->GetStringUTFChars(env, mode, NULL);
+    if (m) sched_set_cores(m), (*env)->ReleaseStringUTFChars(env, mode, m);
 }
 
 static FILE *LOG_FILE;
@@ -176,13 +184,22 @@ int SDL_main(int argc, char *argv[]) {
         __android_log_write(ANDROID_LOG_WARN, "noitadroid", "SDL_main again in the same process: exiting");
         exit(0);
     }
-    // NoitaActivity.getArguments(): "--home <dir> --game <dir> --fmod-dir <dir>", then the game's own. The game
-    // folder is <home>/Noita unless the user chose another (a copy on a memory card, say).
+    // NoitaActivity.getArguments(): "--home <dir> --game <dir> --fmod-dir <dir>", any "--env NAME=VALUE" (the
+    // performance settings, e.g. NOITADROID_CORES), then the game's own. The game folder is <home>/Noita unless the
+    // user chose another (a copy on a memory card, say).
     const char *home = NULL, *fmod = NULL, *game = NULL;
     while (argc >= 3 && !strncmp(argv[1], "--", 2)) {
         if (!strcmp(argv[1], "--home")) home = argv[2];
         else if (!strcmp(argv[1], "--game")) game = argv[2];
         else if (!strcmp(argv[1], "--fmod-dir")) fmod = argv[2];
+        else if (!strcmp(argv[1], "--env")) {
+            char *eq = strchr(argv[2], '=');
+            if (eq && eq > argv[2]) {
+                *eq = 0;
+                setenv(argv[2], eq + 1, 1);
+                *eq = '=';
+            }
+        }
         argv[2] = argv[0];
         argc -= 2, argv += 2;
     }

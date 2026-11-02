@@ -1,5 +1,5 @@
-// Darwin QoS classes. Linux has none: the call succeeds and changes nothing (core placement on Android is done
-// separately, see docs/ANDROID.zh.md).
+// Darwin QoS classes. Linux has none: the call succeeds and changes nothing (core placement on Linux and Android is
+// runtime/sched.c's NOITADROID_CORES).
 #pragma once
 
 typedef enum {

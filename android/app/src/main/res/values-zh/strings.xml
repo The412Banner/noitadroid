@@ -39,6 +39,9 @@
     <string name="menu_pad_default">没有互换的按键。</string>
     <string name="menu_pad_swapped">已互换：%1$s</string>
     <string name="menu_pad_edit">按键互换…</string>
+    <string name="menu_perf">性能</string>
+    <string name="menu_perf_cores">处理器核心：%1$s</string>
+    <string name="menu_perf_edit">性能设置…</string>
     <string name="menu_display">显示</string>
     <string name="menu_overlay_on">FPS 和温度：开</string>
     <string name="menu_overlay_off">FPS 和温度：关</string>
@@ -53,6 +56,19 @@
     <string name="pad_reset">恢复默认</string>
     <string name="pad_choose">%1$s 当作…</string>
     <string name="pad_choose_hint">被换掉的那个键会接过它原来的功能。</string>
+
+    <string name="perf_title">性能设置</string>
+    <string name="perf_cores">处理器核心</string>
+    <string name="perf_device_3">本机有 %1$d 个超大核、%2$d 个大核和 %3$d 个小核。</string>
+    <string name="perf_device_2">本机有 %1$d 个大核和 %2$d 个小核，没有单独的最快核心，没有可选的。</string>
+    <string name="perf_device_1">本机的 %1$d 个核心都一样，没有可选的。</string>
+    <string name="perf_system">系统分配</string>
+    <string name="perf_system_hint">由 Android 决定游戏线程放在哪个核心上。</string>
+    <string name="perf_split">超大核给主线程（推荐）</string>
+    <string name="perf_split_hint" formatted="false">游戏主线程独占最快的核心，模拟线程用其余核心。实测快 8–16%。</string>
+    <string name="perf_fast">全速</string>
+    <string name="perf_fast_hint" formatted="false">同上，主线程等待时也不休眠，让最快的核心保持最高频率。实测快 14–25%，但更热、更费电。</string>
+    <string name="perf_applies">立即生效。模拟线程的数量在下次启动游戏时调整。</string>
 
     <string name="export_running">正在导出…</string>
     <string name="export_done">已导出（%1$s），内容是游戏最近一次存盘：游戏在「保存并退出」时保存当前这局。</string>

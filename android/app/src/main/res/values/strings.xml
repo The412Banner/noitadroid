@@ -42,6 +42,9 @@
     <string name="menu_pad_default">Nothing swapped.</string>
     <string name="menu_pad_swapped">Swapped: %1$s</string>
     <string name="menu_pad_edit">Swap buttons…</string>
+    <string name="menu_perf">Performance</string>
+    <string name="menu_perf_cores">CPU cores: %1$s</string>
+    <string name="menu_perf_edit">Performance settings…</string>
     <string name="menu_display">Display</string>
     <string name="menu_overlay_on">FPS and temperatures: on</string>
     <string name="menu_overlay_off">FPS and temperatures: off</string>
@@ -56,6 +59,19 @@
     <string name="pad_reset">Reset</string>
     <string name="pad_choose">%1$s acts as…</string>
     <string name="pad_choose_hint">The button it takes over gets its old role.</string>
+
+    <string name="perf_title">Performance</string>
+    <string name="perf_cores">CPU cores</string>
+    <string name="perf_device_3">This device has %1$d prime, %2$d big and %3$d small cores.</string>
+    <string name="perf_device_2">This device has %1$d big and %2$d small cores, and no single fastest one: there\'s nothing to choose.</string>
+    <string name="perf_device_1">This device\'s %1$d cores are all alike: there\'s nothing to choose.</string>
+    <string name="perf_system">Android decides</string>
+    <string name="perf_system_hint">Android puts the game\'s threads on any core.</string>
+    <string name="perf_split">Prime core for the main thread (recommended)</string>
+    <string name="perf_split_hint" formatted="false">The game\'s main thread has the fastest core to itself, its simulation threads the others. 8–16% faster in our tests.</string>
+    <string name="perf_fast">Full speed</string>
+    <string name="perf_fast_hint" formatted="false">As above, and the main thread doesn\'t sleep while it waits, which keeps the fastest core at its top clock. 14–25% faster, but hotter and harder on the battery.</string>
+    <string name="perf_applies">Applies at once. The number of simulation threads follows the next time the game starts.</string>
 
     <string name="export_running">Exporting…</string>
     <string name="export_done">Exported (%1$s), as the game last saved: it saves the run when you save and quit.</string>

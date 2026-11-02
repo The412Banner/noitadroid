@@ -29,8 +29,8 @@ import java.util.List;
 
 /**
  * The in-game menu: a swipe from the screen's left edge pulls it out over the game, which stands still meanwhile
- * (Host.hold). It has the saves (export, import), swapped gamepad buttons (PadMap) and the FPS and temperature
- * display (StatsOverlay). Touch and gamepad: the D-pad or left stick moves between buttons, A presses, B goes back.
+ * (Host.hold). It has the saves (export, import), swapped gamepad buttons (PadMap), the performance settings (Perf)
+ * and the FPS and temperature display (StatsOverlay). Touch and gamepad: the D-pad or left stick moves between buttons, A presses, B goes back.
  */
 final class GameDrawer {
     interface Host {
@@ -44,10 +44,13 @@ final class GameDrawer {
 
         /** Gives the keys back to the game. */
         void gameFocus();
+
+        /** Moves the game's threads to the cores of a Perf mode, from now on. */
+        void setCores(String mode);
     }
 
     static final int REQ_EXPORT = 7101, REQ_IMPORT = 7102;
-    private static final int MAIN = 0, PAD = 1, PAD_TARGET = 2, IMPORT = 3;
+    private static final int MAIN = 0, PAD = 1, PAD_TARGET = 2, IMPORT = 3, PERF = 4;
 
     private final Activity a;
     private Context t;  // for strings: the app's language (Lang), which the menu itself switches
@@ -191,7 +194,7 @@ final class GameDrawer {
     private void back() {
         switch (page) {
             case PAD_TARGET: showPad(padSource); break;
-            case PAD: show(MAIN); break;
+            case PAD: case PERF: show(MAIN); break;
             case IMPORT: cancelImport(); break;
             default: close();
         }
@@ -212,6 +215,7 @@ final class GameDrawer {
             case PAD: renderPad(); break;
             case PAD_TARGET: renderPadTarget(); break;
             case IMPORT: renderImport(); break;
+            case PERF: renderPerf(); break;
             default: renderMain();
         }
     }
@@ -229,6 +233,10 @@ final class GameDrawer {
         String swaps = pad.summary();
         hint(swaps.isEmpty() ? t.getString(R.string.menu_pad_default) : t.getString(R.string.menu_pad_swapped, swaps));
         buttons(button(R.string.menu_pad_edit, v -> showPad(0)));
+
+        section(R.string.menu_perf);
+        hint(t.getString(R.string.menu_perf_cores, coresLabel(Perf.cores(a))));
+        buttons(button(R.string.menu_perf_edit, v -> show(PERF)));
 
         section(R.string.menu_display);
         buttons(button(stats.isOn() ? R.string.menu_overlay_on : R.string.menu_overlay_off, v -> {
@@ -265,6 +273,42 @@ final class GameDrawer {
             pad.reset();
             showPad(0);
         }), button(R.string.menu_back, v -> show(MAIN)));
+    }
+
+    private void renderPerf() {
+        content.addView(Ui.text(a, t.getString(R.string.perf_title), 20, ACCENT, true));
+        section(R.string.perf_cores);
+        List<Integer> kinds = Perf.coreKinds();
+        int n = kinds.size(), middle = 0;
+        for (int i = 1; i < n - 1; i++) middle += kinds.get(i);
+        hint(n >= 3 ? t.getString(R.string.perf_device_3, kinds.get(0), middle, kinds.get(n - 1))
+                : n == 2 ? t.getString(R.string.perf_device_2, kinds.get(0), kinds.get(1))
+                : t.getString(R.string.perf_device_1, kinds.get(0)));
+        String current = Perf.cores(a);
+        for (String mode : Perf.modes()) {
+            boolean on = mode.equals(current);
+            Button b = button(coresLabel(mode) + (on ? "   ✓" : ""), v -> {
+                Perf.setCores(a, mode);
+                host.setCores(mode);
+                render();
+                View again = content.findViewWithTag(mode);
+                if (again != null) again.requestFocus();
+            });
+            if (on) b.setTextColor(ACCENT);
+            b.setTag(mode);
+            content.addView(b, Ui.full(0, dp(10), 0, 0));
+            hint(t.getString(Perf.SPLIT.equals(mode) ? R.string.perf_split_hint
+                    : Perf.FAST.equals(mode) ? R.string.perf_fast_hint : R.string.perf_system_hint));
+        }
+        if (Perf.modes().size() > 1) {
+            content.addView(Ui.text(a, t.getString(R.string.perf_applies), 13, TEXT, false), Ui.full(0, dp(14), 0, 0));
+        }
+        buttons(button(R.string.menu_back, v -> show(MAIN)));
+    }
+
+    private String coresLabel(String mode) {
+        return t.getString(Perf.SPLIT.equals(mode) ? R.string.perf_split
+                : Perf.FAST.equals(mode) ? R.string.perf_fast : R.string.perf_system);
     }
 
     private void showPad(int focus) {

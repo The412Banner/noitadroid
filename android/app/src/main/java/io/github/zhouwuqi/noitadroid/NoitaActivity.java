@@ -1,6 +1,7 @@
 package io.github.zhouwuqi.noitadroid;
 
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.os.Environment;
@@ -15,6 +16,7 @@ import org.libsdl.app.SDLActivity;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -34,6 +36,9 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
 
     /** Holds the game (or lets it go), after it has shown afterFrames more frames. */
     static native void nativeHold(boolean on, int afterFrames);
+
+    /** Moves the game's threads to the cores of a Perf mode (runtime/sched.c). */
+    static native void nativeSetCores(String mode);
 
     private PadMap pad;
     private GameDrawer drawer;
@@ -134,6 +139,15 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
         if (mSurface != null) mSurface.requestFocus();
     }
 
+    @Override
+    public void setCores(String mode) {
+        try {
+            nativeSetCores(mode);
+        } catch (UnsatisfiedLinkError e) {  // game code built before the setting existed: at the next start
+            Log.w(TAG, "nativeSetCores: " + e);
+        }
+    }
+
     /**
      * FMOD's libraries, when the APK has them, load here rather than only by runtime/fmod.c's dlopen: libfmod.so's
      * JNI_OnLoad keeps the Java VM, which FMOD needs to ask org.fmod.FMOD about the audio output. The dlopen then
@@ -199,13 +213,30 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
     }
 
     /**
-     * runtime/android_main.c reads "--home" (shared storage: saves, the log), "--game" (the game folder, GameCheck)
-     * and "--fmod-dir" (FMOD's libraries: the APK's, or the imported ones).
+     * runtime/android_main.c reads "--home" (shared storage: saves, the log), "--game" (the game folder, GameCheck),
+     * "--fmod-dir" (FMOD's libraries: the APK's, or the imported ones) and "--env NAME=VALUE" (the Perf settings).
+     * A debuggable build also takes more from its intent, for benchmarks over adb (tools/android/perfbench.sh):
+     * "noitadroid.env" (NAME=VALUE ..., after the settings, so it wins) and "noitadroid.args" (the game's own).
      */
     @Override
     protected String[] getArguments() {
         File fmod = importedFmod();
-        return new String[] {"--home", GameCheck.home().getPath(), "--game", GameCheck.gameDir(this).getPath(),
-                "--fmod-dir", fmod != null ? fmod.getPath() : getApplicationInfo().nativeLibraryDir};
+        List<String> args = new ArrayList<>(Arrays.asList("--home", GameCheck.home().getPath(),
+                "--game", GameCheck.gameDir(this).getPath(),
+                "--fmod-dir", fmod != null ? fmod.getPath() : getApplicationInfo().nativeLibraryDir));
+        for (String e : Perf.env(this)) args.addAll(Arrays.asList("--env", e));
+        Intent in = getIntent();
+        boolean debug = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
+        if (debug && in != null) {
+            for (String e : words(in.getStringExtra("noitadroid.env"))) args.addAll(Arrays.asList("--env", e));
+            args.addAll(words(in.getStringExtra("noitadroid.args")));
+        }
+        return args.toArray(new String[0]);
+    }
+
+    private static List<String> words(String s) {
+        List<String> w = new ArrayList<>();
+        if (s != null) for (String x : s.trim().split("\\s+")) if (!x.isEmpty()) w.add(x);
+        return w;
     }
 }

@@ -8,6 +8,12 @@
 //                                                   sched_yield
 // The defaults are what won the PLAN3 Phase 9 A/Bs (docs/PROFILE.md "Scheduling"): all CPUs and nap20; user-interactive
 // QoS won PLAN4 Phase 16's (jungle work_ms -8.2%).
+// Linux and Android have no QoS classes; there the game's threads get a CPU affinity instead (sched.c):
+//   NOITADROID_CORES=system|big|prime|split|fast   which cores the main and guest threads run on, and the CPU count
+//                                                   (unless MINA4MAC_CPUS gives a number); the in-game menu changes
+//                                                   it while the game runs (sched_set_cores)
+//   NOITADROID_HINT=0|1                           Android 13+: a performance hint session that reports each frame's
+//                                                   work against a 16.7 ms target (default 0: no gain on the Pocket S)
 #pragma once
 #include <stdint.h>
 
@@ -15,3 +21,10 @@ void sched_init(void);          // read the env vars; sets the calling (main) th
 uint32_t sched_ncpu(void);      // the CPU count to report, 1..32
 void sched_thread_start(void);  // at the start of a guest thread: set its QoS
 void sched_sleep0(void);        // Sleep(0) / a yield inside a spin-wait loop
+void sched_frame(int after_swap);       // around each SDL_GL_SwapWindow: the frame-time hint's clock
+#ifdef __linux__
+void sched_set_cores(const char *mode);  // NOITADROID_CORES while the game runs (the CPU count stays)
+#endif
+#ifdef __ANDROID__
+void sched_set_hint(int on);             // NOITADROID_HINT
+#endif

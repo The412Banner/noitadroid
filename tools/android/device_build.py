@@ -42,7 +42,7 @@ EXPECTED = {
 }
 # The app's native interface (NoitaActivity's natives, SDL's Java glue, the arguments): the app uses a libmain.so built
 # for its own ABI only. Bump it when they change, so the app asks for a new build.
-NATIVE_ABI = 2  # 2: NoitaActivity passes --game
+NATIVE_ABI = 3  # 2: NoitaActivity passes --game; 3: --env and nativeSetCores (the Performance page)
 MODULES = ("msvcp120", "noita")  # msvcp120 first: noita's register summaries use its exports'
 # Stage weights for the progress bar: seconds on a Snapdragon G3x Gen 2 (AYANEO Pocket S).
 STAGES = {"check": 2, "discover": 125, "bridges": 10, "regsum": 200, "lift": 130, "compile": 270, "link": 3}
