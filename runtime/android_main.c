@@ -106,6 +106,49 @@ static void config_fit_display(void) {
     fprintf(stderr, "[noitadroid] %s: fullscreen %dx%d\n", path, w, h);
 }
 
+// SDL makes Android's accelerometer a 3-axis joystick by default, and the game takes any joystick as a gamepad: its
+// menus then follow how the device is tilted (the cursor runs off to one side). The hint must be set before the
+// game's SDL_Init opens the joystick subsystem.
+//
+// With <home>/debug_input present, a thread reports the joysticks SDL sees (game controller or not, opened by the
+// game or not) and their axes away from the center, whenever that changes. If the file says "accelerometer", SDL
+// keeps its accelerometer joystick, to compare.
+static void *input_report(void *unused) {
+    char last[4096] = "", now[4096];
+    for (;; SDL_Delay(500)) {
+        if (!SDL_WasInit(SDL_INIT_JOYSTICK)) continue;
+        size_t n = 0;
+        SDL_LockJoysticks();
+        for (int i = 0, count = SDL_NumJoysticks(); i < count && n < sizeof now - 512; i++) {
+            SDL_Joystick *j = SDL_JoystickFromInstanceID(SDL_JoystickGetDeviceInstanceID(i));
+            n += snprintf(now + n, sizeof now - n, " [%d \"%s\"%s%s", i, SDL_JoystickNameForIndex(i),
+                          SDL_IsGameController(i) ? " controller" : "", j ? " open" : "");
+            for (int a = 0; j && a < SDL_JoystickNumAxes(j) && n < sizeof now - 32; a++) {
+                int v = SDL_JoystickGetAxis(j, a) / 4096;  // coarse, so noise doesn't count as a change
+                if (v) n += snprintf(now + n, sizeof now - n, " axis%d=%d/8", a, v);
+            }
+            n += snprintf(now + n, sizeof now - n, "]");
+        }
+        SDL_UnlockJoysticks();
+        if (strcmp(now, last)) fprintf(stderr, "[noitadroid] joysticks:%s\n", now), strcpy(last, now);
+    }
+    return NULL;
+}
+
+static void setup_input(const char *home) {
+    char path[1024], opt[64] = "";
+    snprintf(path, sizeof path, "%s/debug_input", home);
+    FILE *f = fopen(path, "r");
+    if (f && !fgets(opt, sizeof opt, f)) opt[0] = 0;
+    if (!strstr(opt, "accelerometer")) SDL_SetHint(SDL_HINT_ACCELEROMETER_AS_JOYSTICK, "0");
+    if (!f) return;
+    fclose(f);
+    fprintf(stderr, "[noitadroid] %s: reporting joysticks (accelerometer joystick %s)\n", path,
+            strstr(opt, "accelerometer") ? "on" : "off");
+    pthread_t t;
+    if (!pthread_create(&t, NULL, input_report, NULL)) pthread_detach(t);
+}
+
 static int fail(const char *msg) {
     fprintf(stderr, "[noitadroid] %s\n", msg);
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "noitadroid", msg, NULL);
@@ -150,6 +193,7 @@ int SDL_main(int argc, char *argv[]) {
                  getenv("NOITA_DIR"), strerror(errno));
         return fail(msg);
     }
+    setup_input(home);
     config_fit_display();
     int r = noitadroid_main(argc, argv);
     fprintf(stderr, "[noitadroid] the game returned %d\n", r);

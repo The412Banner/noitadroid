@@ -120,7 +120,9 @@ adb logcat -s noitadroid                     # 也会写到 /sdcard/Android/data
 
 `libmain.so` 只导出 `SDL_main`。`build_game.py` 是增量构建：只改了运行时的一个文件时约 1 分钟，其中重编 1 个文件、链接约 20 秒。
 
-FMOD：从 fmod.com 下载 FMOD Engine 2.01.x 的 Android 包，把包里的内容解压到 `.local-deps/fmod/`，使 `api/core/lib/arm64-v8a/libfmod.so`、`api/studio/lib/arm64-v8a/libfmodstudio.so` 和 `api/core/lib/fmod.jar` 都在对应位置。之后 `build_game.py` 会把它们打进 APK。没有 FMOD 时游戏静音运行。
+FMOD：运行 `tools/android/setup_fmod.sh`。它会先在 `~/Downloads`、`.local-deps`、`/path/to/downloads`、`/path/to/temp` 里找 `fmodstudioapi201*android.tar.gz`；找不到就在终端里询问 fmod.com 账号密码，登录后下载 2.01.23 的 Android 包。账号密码只发给 fmod.com，不会保存。之后它会检查版本必须是 2.01.x，再解压到 `.local-deps/fmod/`，使 `api/core/lib/arm64-v8a/libfmod.so`、`api/studio/lib/arm64-v8a/libfmodstudio.so` 和 `api/core/lib/fmod.jar` 就位。然后 `build_game.py` 会把它们打进 APK。没有 FMOD 时游戏静音运行。
+
+手柄：SDL 默认把 Android 的加速度计注册成摇杆，而游戏会把任何摇杆都当手柄用，结果菜单光标会跟着机身倾斜跑。`runtime/android_main.c` 因此关掉了 `SDL_HINT_ACCELEROMETER_AS_JOYSTICK`。排查手柄问题时，在 `/sdcard/noitadroid/` 下放一个 `debug_input` 文件，日志里就会记录每个摇杆和偏离中心的轴；文件内容写 `accelerometer` 可以恢复加速度计摇杆，用来对比。
 
 生成的 APK 里有由游戏转换而来的代码：只装在自己的设备上，不要分发。
 
