@@ -1,17 +1,22 @@
 package io.github.zhouwuqi.noitadroid;
 
+import static io.github.zhouwuqi.noitadroid.Ui.ACCENT;
+import static io.github.zhouwuqi.noitadroid.Ui.BAD;
+import static io.github.zhouwuqi.noitadroid.Ui.BG;
+import static io.github.zhouwuqi.noitadroid.Ui.CARD;
+import static io.github.zhouwuqi.noitadroid.Ui.DIM;
+import static io.github.zhouwuqi.noitadroid.Ui.GOOD;
+import static io.github.zhouwuqi.noitadroid.Ui.TEXT;
+import static io.github.zhouwuqi.noitadroid.Ui.WAIT;
+
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
-import android.graphics.Typeface;
-import android.graphics.drawable.GradientDrawable;
-import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.Settings;
 import android.text.format.Formatter;
-import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,9 +32,6 @@ import android.widget.TextView;
  * Plain framework views: touch and a gamepad (A is the confirm key, B is back) both work.
  */
 public class SetupActivity extends Activity {
-    private static final int BG = 0xff0e0c12, CARD = 0xff1b1822, TEXT = 0xfff4efe6, DIM = 0xffb3adbf,
-            ACCENT = 0xffffcf66, GOOD = 0xff7bd88f, BAD = 0xffff6b5a, WAIT = 0xff8a8594;
-
     private LinearLayout rows;
     private TextView status;
     private Button start, recheck;
@@ -44,10 +46,17 @@ public class SetupActivity extends Activity {
         setContentView(layout());
     }
 
+    /** The launcher's icon again, with this screen still up: into the game if it can start by now. */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if (new GameCheck(this).ready()) startGame();
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
-        if (rows != null) show();  // back from Android's settings, or from copying the game over USB
+        if (rows != null && !isFinishing()) show();  // back from Android's settings, or from copying the game over USB
     }
 
     private void startGame() {
@@ -119,19 +128,18 @@ public class SetupActivity extends Activity {
         ImageView icon = new ImageView(this);
         icon.setImageDrawable(getApplicationInfo().loadIcon(getPackageManager()));
         left.addView(icon, new LinearLayout.LayoutParams(dp(64), dp(64)));
-        left.addView(text("noitadroid", 28, ACCENT, true), margins(0, dp(8), 0, 0));
-        left.addView(text(getString(R.string.setup_subtitle), 15, TEXT, false));
-        left.addView(text(getString(R.string.setup_intro, GameCheck.GOG_BUILD), 13, DIM, false),
-                margins(0, dp(12), 0, 0));
-        status = text("", 14, TEXT, true);
-        left.addView(status, margins(0, dp(12), 0, 0));
-        View spacer = new View(this);
-        left.addView(spacer, new LinearLayout.LayoutParams(1, 0, 1));
+        left.addView(Ui.text(this, "noitadroid", 28, ACCENT, true), Ui.wrap(0, dp(8), 0, 0));
+        left.addView(Ui.text(this, getString(R.string.setup_subtitle), 15, TEXT, false));
+        left.addView(Ui.text(this, getString(R.string.setup_intro, GameCheck.GOG_BUILD), 13, DIM, false),
+                Ui.wrap(0, dp(12), 0, 0));
+        status = Ui.text(this, "", 14, TEXT, true);
+        left.addView(status, Ui.wrap(0, dp(12), 0, 0));
+        left.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1));
         LinearLayout buttons = new LinearLayout(this);
-        start = button(R.string.start, v -> startGame());
-        recheck = button(R.string.recheck, v -> show());
+        start = Ui.button(this, getString(R.string.start), v -> startGame());
+        recheck = Ui.button(this, getString(R.string.recheck), v -> show());
         buttons.addView(start);
-        buttons.addView(recheck, margins(dp(12), 0, 0, 0));
+        buttons.addView(recheck, Ui.wrap(dp(12), 0, 0, 0));
         left.addView(buttons);
         root.addView(left, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 2));
 
@@ -151,7 +159,7 @@ public class SetupActivity extends Activity {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(14), dp(12), dp(14), dp(12));
-        row.setBackground(rounded(CARD, 0, 0));
+        row.setBackground(Ui.rounded(this, CARD, 0, 0));
         String mark;
         int color;
         switch (state) {
@@ -160,73 +168,26 @@ public class SetupActivity extends Activity {
             case INFO: mark = "i"; color = ACCENT; break;
             default: mark = "…"; color = WAIT;
         }
-        TextView glyph = text(mark, 22, color, true);
+        TextView glyph = Ui.text(this, mark, 22, color, true);
         glyph.setGravity(Gravity.CENTER);
         row.addView(glyph, new LinearLayout.LayoutParams(dp(36), ViewGroup.LayoutParams.WRAP_CONTENT));
         LinearLayout texts = new LinearLayout(this);
         texts.setOrientation(LinearLayout.VERTICAL);
-        texts.addView(text(getString(title), 16, TEXT, true));
-        texts.addView(text(detail, 13, DIM, false), margins(0, dp(2), 0, 0));
+        texts.addView(Ui.text(this, getString(title), 16, TEXT, true));
+        texts.addView(Ui.text(this, detail, 13, DIM, false), Ui.wrap(0, dp(2), 0, 0));
         LinearLayout.LayoutParams grow = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
         grow.leftMargin = dp(8);
         row.addView(texts, grow);
         Button b = null;
         if (action != 0) {
-            b = button(action, onAction);
-            row.addView(b, margins(dp(12), 0, 0, 0));
+            b = Ui.button(this, getString(action), onAction);
+            row.addView(b, Ui.wrap(dp(12), 0, 0, 0));
         }
-        LinearLayout.LayoutParams full = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        full.bottomMargin = dp(10);
-        rows.addView(row, full);
+        rows.addView(row, Ui.full(0, 0, 0, dp(10)));
         return first != null ? first : b;
     }
 
-    private TextView text(String s, int sp, int color, boolean bold) {
-        TextView t = new TextView(this);
-        t.setText(s);
-        t.setTextSize(TypedValue.COMPLEX_UNIT_SP, sp);
-        t.setTextColor(color);
-        t.setLineSpacing(0, 1.15f);
-        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
-        return t;
-    }
-
-    /** A button whose focus shows plainly, for a gamepad. */
-    private Button button(int label, View.OnClickListener onClick) {
-        Button b = new Button(this);
-        b.setText(label);
-        b.setAllCaps(false);
-        b.setTextColor(TEXT);
-        b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 15);
-        b.setPadding(dp(20), dp(8), dp(20), dp(8));
-        b.setMinHeight(dp(44));
-        b.setStateListAnimator(null);
-        StateListDrawable bg = new StateListDrawable();
-        bg.addState(new int[] {android.R.attr.state_pressed}, rounded(0xff4a4157, dp(2), ACCENT));
-        bg.addState(new int[] {android.R.attr.state_focused}, rounded(0xff3a3346, dp(2), ACCENT));
-        bg.addState(new int[] {}, rounded(0xff2a2533, 0, 0));
-        b.setBackground(bg);
-        b.setOnClickListener(onClick);
-        return b;
-    }
-
-    private GradientDrawable rounded(int color, int stroke, int strokeColor) {
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(color);
-        d.setCornerRadius(dp(10));
-        if (stroke > 0) d.setStroke(stroke, strokeColor);
-        return d;
-    }
-
-    private LinearLayout.LayoutParams margins(int l, int t, int r, int b) {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
-        p.setMargins(l, t, r, b);
-        return p;
-    }
-
     private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
+        return Ui.dp(this, v);
     }
 }

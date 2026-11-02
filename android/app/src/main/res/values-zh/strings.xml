@@ -27,4 +27,41 @@
     <string name="sound_title">声音（FMOD）</string>
     <string name="sound_ok">此应用已包含 FMOD %1$s。</string>
     <string name="sound_missing">这个应用构建时没有加入 FMOD，所以游戏没有声音。FMOD 的许可证不允许分享它，只能由构建应用的人自己加入（tools/android/setup_fmod.sh）。不影响游玩。</string>
+
+    <!-- 游戏内菜单（GameDrawer）：从左边缘滑出 -->
+    <string name="menu_paused">游戏已暂停。</string>
+    <string name="menu_saves">存档</string>
+    <string name="menu_saves_hint">导出为 zip，或从 zip 导入（电脑版的存档也可以）。</string>
+    <string name="menu_export">导出</string>
+    <string name="menu_import">导入</string>
+    <string name="menu_pad">手柄按键</string>
+    <string name="menu_pad_default">没有互换的按键。</string>
+    <string name="menu_pad_swapped">已互换：%1$s</string>
+    <string name="menu_pad_edit">按键互换…</string>
+    <string name="menu_display">显示</string>
+    <string name="menu_overlay_on">FPS 和温度：开</string>
+    <string name="menu_overlay_off">FPS 和温度：关</string>
+    <string name="menu_resume">回到游戏</string>
+    <string name="menu_back">返回</string>
+    <string name="cancel">取消</string>
+    <string name="list_sep">、</string>
+
+    <string name="pad_title">手柄按键互换</string>
+    <string name="pad_hint">先选一个按键，再选它要当作哪个键用，两个键会互换。只对游戏生效；摇杆、十字键和扳机不受影响。游戏自带的设置里也能改键位。</string>
+    <string name="pad_reset">恢复默认</string>
+    <string name="pad_choose">%1$s 当作…</string>
+    <string name="pad_choose_hint">被换掉的那个键会接过它原来的功能。</string>
+
+    <string name="export_running">正在导出…</string>
+    <string name="export_done">已导出（%1$s），内容是游戏最近一次存盘：游戏在「保存并退出」时保存当前这局。</string>
+    <string name="export_failed">导出失败：%1$s</string>
+    <string name="import_reading">正在读取 zip…</string>
+    <string name="import_failed">导入失败：%1$s</string>
+    <string name="import_title">导入这个存档？</string>
+    <string name="import_has_run">一局进行中的游戏</string>
+    <string name="import_has_progress">进度（解锁内容）</string>
+    <string name="import_has_stats">统计</string>
+    <string name="import_what">包含%1$s：%2$d 个文件，%3$s。</string>
+    <string name="import_warning">它会替换当前存档，当前存档会备份为存档文件夹里的 save00.backup-（日期）。游戏会用导入的存档重启。</string>
+    <string name="import_go">导入并重启</string>
 </resources>

@@ -30,4 +30,41 @@
     <string name="sound_title">Sound (FMOD)</string>
     <string name="sound_ok">FMOD %1$s is in this app.</string>
     <string name="sound_missing">This app was built without FMOD, so the game is silent. FMOD\'s license doesn\'t allow sharing it: whoever builds the app adds it (tools/android/setup_fmod.sh). Not needed to play.</string>
+
+    <!-- The in-game menu (GameDrawer): a swipe from the left edge -->
+    <string name="menu_paused">The game is paused.</string>
+    <string name="menu_saves">Saves</string>
+    <string name="menu_saves_hint">To a zip, or from one (Windows saves too).</string>
+    <string name="menu_export">Export</string>
+    <string name="menu_import">Import</string>
+    <string name="menu_pad">Gamepad buttons</string>
+    <string name="menu_pad_default">Nothing swapped.</string>
+    <string name="menu_pad_swapped">Swapped: %1$s</string>
+    <string name="menu_pad_edit">Swap buttons…</string>
+    <string name="menu_display">Display</string>
+    <string name="menu_overlay_on">FPS and temperatures: on</string>
+    <string name="menu_overlay_off">FPS and temperatures: off</string>
+    <string name="menu_resume">Back to the game</string>
+    <string name="menu_back">Back</string>
+    <string name="cancel">Cancel</string>
+    <string name="list_sep">", "</string>
+
+    <string name="pad_title">Swap gamepad buttons</string>
+    <string name="pad_hint">Pick a button, then the one it should act as: the two swap. For the game only; the sticks, D-pad and triggers stay. The game\'s own settings can rebind its actions too.</string>
+    <string name="pad_reset">Reset</string>
+    <string name="pad_choose">%1$s acts as…</string>
+    <string name="pad_choose_hint">The button it takes over gets its old role.</string>
+
+    <string name="export_running">Exporting…</string>
+    <string name="export_done">Exported (%1$s), as the game last saved: it saves the run when you save and quit.</string>
+    <string name="export_failed">Export failed: %1$s</string>
+    <string name="import_reading">Reading the zip…</string>
+    <string name="import_failed">Import failed: %1$s</string>
+    <string name="import_title">Import this save?</string>
+    <string name="import_has_run">a run</string>
+    <string name="import_has_progress">progress (unlocks)</string>
+    <string name="import_has_stats">stats</string>
+    <string name="import_what">It has %1$s: %2$d files, %3$s.</string>
+    <string name="import_warning">It replaces the current save, which is kept as save00.backup-(date) in the saves folder. The game restarts with the imported save.</string>
+    <string name="import_go">Import and restart</string>
 </resources>

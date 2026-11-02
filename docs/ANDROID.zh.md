@@ -124,6 +124,18 @@ FMOD：运行 `tools/android/setup_fmod.sh`。它会先在 `~/Downloads` 和 `.l
 
 首屏引导：启动器入口是 `SetupActivity`。它用 `GameCheck` 检查四项：所有文件访问权限、`/sdcard/noitadroid/Noita` 里的 noita.exe、msvcp120.dll 和 data/data.wak、游戏版本（比对哈希），以及 FMOD 是否在 APK 里。比对的标准是 `build_game.py` 在构建时写进 `assets/noitadroid.properties` 的值：构建者那份游戏里 noita.exe 和 msvcp120.dll 的 sha256、data.wak 的大小、FMOD 版本。必需项都满足时，它直接启动 `NoitaActivity`，不显示任何界面（第一次要算哈希，约 0.1 秒，之后按文件大小和修改时间缓存）。否则显示中英文的检查清单，每项都写明该怎么做，触屏和手柄都能操作，回到前台时会自动重查。拿到权限后它会自动建好 Noita 文件夹，方便通过 USB 拷贝。已在 Pocket S 上测过：一切就绪、没有权限、缺游戏文件、版本不对四种情况，以及手柄 A 键重查。
 
+游戏内菜单（`GameDrawer`）：在游戏中从屏幕左边缘往右滑，会拉出侧边栏。
+- 系统手势导航也用这个边缘做「返回」，所以 `NoitaActivity` 把左边缘中间的 200 dp（Android 允许的最大值）排除在系统手势之外，在这段里滑才能打开。
+- 侧边栏打开时游戏停住：`runtime/gles.c` 包装了 `SDL_GL_SwapWindow`，在帧末尾等待，同时用 FMOD 的 `System::mixerSuspend` 让声音停下。
+- 应用切到后台时会先放开这个等待，交给 SDL 自己暂停；回到前台后先让游戏画 4 帧再停住，这样侧边栏后面看得到游戏画面，不是黑屏。
+- 菜单内容：
+  - 存档导出：用 SAF 存成 zip，结构和电脑版 `Nolla_Games_Noita` 一致，包含 save00 和 save_shared。
+  - 存档导入：从 zip 里取出 save00 先放到暂存区，确认后由 `RestartActivity`（独立进程 `:restart`）重启游戏。新的 `NoitaActivity` 在游戏启动前换入存档，原来的存档改名为 `save00.backup-日期`。
+  - 手柄按键互换：`PadMap`，始终是一一对应的置换，在按键到达 SDL 之前替换键码。
+  - FPS/温度显示：`StatsOverlay`，帧数来自 swap 计数，温度读自应用有权限读取的 thermal zone。
+- 触屏和手柄都能操作，B 键返回上一页。
+- 已在 Pocket S 上验证：边缘滑动打开，打开时 0 FPS、关上后约 60 FPS，按键互换界面，导出（1.2 MB、131 个文件），导入后重启并备份，菜单打开时音频流停止。
+
 手柄：SDL 默认把 Android 的加速度计注册成摇杆，而游戏会把任何摇杆都当手柄用，结果菜单光标会跟着机身倾斜跑。`runtime/android_main.c` 因此关掉了 `SDL_HINT_ACCELEROMETER_AS_JOYSTICK`。排查手柄问题时，在 `/sdcard/noitadroid/` 下放一个 `debug_input` 文件，日志里就会记录每个摇杆和偏离中心的轴；文件内容写 `accelerometer` 可以恢复加速度计摇杆，用来对比。
 
 生成的 APK 里有由游戏转换而来的代码：只装在自己的设备上，不要分发。

@@ -128,6 +128,8 @@ static uint32_t intern(const char *s) {
 
 // Backend selection (at Studio::System::create, the game's first FMOD call).
 static FmodApi NATIVE;
+static void *native_core;  // libfmod's handle, for rt_fmod_suspend
+static FMOD_STUDIO_SYSTEM *studio_system;
 static const char *load_native(void) {
     static char err[PATH_MAX + 256];
     char dir[PATH_MAX], exe[PATH_MAX], path[PATH_MAX];
@@ -162,7 +164,18 @@ static const char *load_native(void) {
     }
     FMOD_API(FMOD_API_SYM)
 #undef FMOD_API_SYM
+    native_core = libs[0];
     return NULL;
+}
+
+// Silences or resumes all of the game's sound (FMOD's System::mixerSuspend/mixerResume, what mobile apps use when
+// they go to the background), from the game's thread: noitadroid's in-game menu holds the game at a frame's end.
+void rt_fmod_suspend(int on) {
+    FMOD_SYSTEM *core = NULL;
+    if (F != &NATIVE || !studio_system || F->Studio_System_GetCoreSystem(studio_system, &core) != FM_OK) return;
+    FMOD_RESULT (*fn)(FMOD_SYSTEM *) = (FMOD_RESULT (*)(FMOD_SYSTEM *))dlsym(
+        native_core, on ? "FMOD_System_MixerSuspend" : "FMOD_System_MixerResume");
+    if (fn) fn(core);
 }
 static void select_backend(void) {
     if (F) return;
@@ -276,6 +289,7 @@ HOST(fmodstudio, create, "?create@System@Studio@FMOD@@SG?AW4FMOD_RESULT@@PAPAV12
     select_backend();
     FMOD_STUDIO_SYSTEM *s = NULL;
     FMOD_RESULT r = F->Studio_System_Create(&s, ARG(1));
+    if (r == FM_OK) studio_system = s;
     out32(ARG(0), wrap(K_SYSTEM, s)), RET(r);
 }
 HOST(fmodstudio, sys_initialize, "?initialize@System@Studio@FMOD@@QAG?AW4FMOD_RESULT@@HIIPAX@Z", 20) {

@@ -107,10 +107,11 @@ def gl_libs() -> list[str]:
 
 
 def gl_wrap_flags() -> list[str]:
-    """Link flags that route SDL's context calls through runtime/gles.c (none on Apple)."""
+    """Link flags that route SDL's context calls and buffer swaps through runtime/gles.c (none on Apple)."""
     if APPLE:
         return []
-    return ["-Wl," + ",".join(f"--wrap={f}" for f in ("SDL_Init", "SDL_GL_SetAttribute", "SDL_GL_CreateContext"))]
+    wrapped = ("SDL_Init", "SDL_GL_SetAttribute", "SDL_GL_CreateContext", "SDL_GL_SwapWindow")
+    return ["-Wl," + ",".join(f"--wrap={f}" for f in wrapped)]
 
 
 def gl_glue() -> list[str]:

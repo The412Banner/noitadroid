@@ -8,8 +8,10 @@
 // Android drops stdout and stderr, where the runtime reports: they go to logcat (tag noitadroid) and <home>/noitadroid.log.
 #include <SDL.h>
 #include <android/log.h>
+#include <jni.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +19,17 @@
 #include <unistd.h>
 
 int noitadroid_main(int argc, char **argv);
+void noitadroid_hold(int on, int after);  // runtime/gles.c
+extern uint64_t noitadroid_frames;
+
+// NoitaActivity's natives (its in-game menu): the frames shown so far, and holding the game while the menu is open.
+JNIEXPORT jlong JNICALL Java_io_github_zhouwuqi_noitadroid_NoitaActivity_nativeFrames(JNIEnv *env, jclass cls) {
+    return (jlong)__atomic_load_n(&noitadroid_frames, __ATOMIC_RELAXED);
+}
+JNIEXPORT void JNICALL Java_io_github_zhouwuqi_noitadroid_NoitaActivity_nativeHold(JNIEnv *env, jclass cls,
+                                                                                     jboolean on, jint after) {
+    noitadroid_hold(on, after);
+}
 
 static FILE *LOG_FILE;
 

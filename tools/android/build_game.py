@@ -213,8 +213,8 @@ def main():
     objs = [o for o, _ in done]
     t2 = time.time()
 
-    exports = OUT / "exports.map"  # only SDL_main: SDL's Java side looks it up; everything else stays local
-    exports.write_text("{ global: SDL_main; local: *; };\n")
+    exports = OUT / "exports.map"  # SDL_main, which SDL's Java side looks up, and NoitaActivity's natives
+    exports.write_text("{ global: SDL_main; Java_io_github_zhouwuqi_noitadroid_*; local: *; };\n")
     libmain = JNI / "libmain.so"
     link = [*target.cc(), "-shared", *target.linker(), *lto]
     if lto:
