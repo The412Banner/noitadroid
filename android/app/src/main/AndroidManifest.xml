@@ -9,6 +9,12 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- The game files, saves and log are in /sdcard/noitadroid (runtime/android_main.c). -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- Building the game's code on the device (BuildService): a foreground service that keeps the CPU awake, and
+         its progress in a notification. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="@string/app_name"
@@ -16,6 +22,7 @@
         android:allowBackup="false"
         android:hardwareAccelerated="true"
         android:extractNativeLibs="true"
+        android:appComponentFactory=".AppFactory"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
         <!-- The launcher's: checks that the game can start (GameCheck), goes straight to NoitaActivity when it can,
              and shows what's missing when it can't. -->
@@ -42,6 +49,15 @@
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
         </activity>
+        <!-- Unpacks GOG's installer and builds the game's code from it, on the device: about 15 minutes. -->
+        <service
+            android:name=".BuildService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Compiles the user's own copy of a game into native code on the device" />
+        </service>
         <!-- After an import from the in-game menu: waits, in a process of its own, for the game's to end, then
              starts it again. -->
         <activity

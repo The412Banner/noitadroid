@@ -26,7 +26,10 @@ public class RestartActivity extends Activity {
                 SystemClock.sleep(50);
             }
             runOnUiThread(() -> {
-                startActivity(new Intent(this, SetupActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                // A new task: the old one may still hold the dead process's activities, and an intent equal to its
+                // root's would only bring it to the front, starting nothing.
+                startActivity(new Intent(this, SetupActivity.class)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
                 finish();
                 overridePendingTransition(0, 0);
             });

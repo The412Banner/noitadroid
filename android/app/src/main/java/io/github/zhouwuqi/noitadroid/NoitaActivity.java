@@ -14,7 +14,9 @@ import android.widget.FrameLayout;
 import org.libsdl.app.SDLActivity;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * SDL's activity, running libmain.so's SDL_main (runtime/android_main.c). The game files, saves and log live in
@@ -139,16 +141,71 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
      */
     @Override
     protected String[] getLibraries() {
+        List<String> libs = new ArrayList<>(Collections.singletonList("SDL2"));
         if (new File(getApplicationInfo().nativeLibraryDir, "libfmodstudio.so").exists()) {
-            return new String[] {"SDL2", "fmod", "fmodstudio", "main"};
+            libs.add("fmod");
+            libs.add("fmodstudio");
         }
-        return new String[] {"SDL2", "main"};
+        if (!localGame(this).exists()) libs.add("main");
+        return libs.toArray(new String[0]);
     }
 
-    /** runtime/android_main.c reads "--home" (shared storage) and "--fmod-dir" (FMOD's extracted libraries). */
+    /**
+     * The game's code built on this device (NativeBuild) lives in the app's own storage. When it's there it runs
+     * instead of an APK's libmain.so; an APK without one needs it.
+     */
+    static File localGame(android.content.Context c) {
+        return NativeBuild.gameLib(c);
+    }
+
+    /**
+     * Loads FMOD the user imported (FmodImport) and the game's code built on this device, from the app's own storage.
+     * Imported FMOD loads only when its classes are in this class loader (AppFactory): without them its JNI_OnLoad
+     * would crash the app, and the game runs silent instead.
+     */
+    @Override
+    public void loadLibraries() {
+        super.loadLibraries();
+        if (importedFmod() != null) {
+            File fmod = FmodImport.dir(this);
+            System.load(new File(fmod, "libfmod.so").getPath());
+            System.load(new File(fmod, "libfmodstudio.so").getPath());
+        }
+        File local = localGame(this);
+        if (local.exists()) {
+            local.setReadOnly();  // Android 14 refuses to load code from a writable file
+            System.load(local.getPath());
+        }
+    }
+
+    /** FMOD's folder when it was imported (not in the APK) and its classes are here; else null. */
+    private File importedFmod() {
+        if (new File(getApplicationInfo().nativeLibraryDir, "libfmodstudio.so").exists()) return null;
+        if (FmodImport.version(this) == null) return null;
+        try {
+            Class.forName("org.fmod.AudioDevice", false, getClassLoader());
+            return FmodImport.dir(this);
+        } catch (ClassNotFoundException e) {
+            Log.w(TAG, "FMOD is imported, but its classes aren't in the class loader: silent");
+            return null;
+        }
+    }
+
+    /** SDL's thread finds SDL_main in this library. */
+    @Override
+    protected String getMainSharedObject() {
+        File local = localGame(this);
+        return local.exists() ? local.getPath() : super.getMainSharedObject();
+    }
+
+    /**
+     * runtime/android_main.c reads "--home" (shared storage: saves, the log), "--game" (the game folder, GameCheck)
+     * and "--fmod-dir" (FMOD's libraries: the APK's, or the imported ones).
+     */
     @Override
     protected String[] getArguments() {
-        String home = Environment.getExternalStorageDirectory().getAbsolutePath() + "/noitadroid";
-        return new String[] {"--home", home, "--fmod-dir", getApplicationInfo().nativeLibraryDir};
+        File fmod = importedFmod();
+        return new String[] {"--home", GameCheck.home().getPath(), "--game", GameCheck.gameDir(this).getPath(),
+                "--fmod-dir", fmod != null ? fmod.getPath() : getApplicationInfo().nativeLibraryDir};
     }
 }
