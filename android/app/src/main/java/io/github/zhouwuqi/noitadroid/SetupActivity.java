@@ -15,6 +15,7 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.BatteryManager;
@@ -221,10 +222,12 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
 
     /** Before the first build: what it takes (time, heat, the charger), then BuildService. */
     private void confirmBuild(File installer) {
-        BatteryManager battery = getSystemService(BatteryManager.class);
-        boolean charging = battery != null && battery.isCharging();
+        // plugged in, not BatteryManager.isCharging(): that one is only true while the level goes up, which on a
+        // computer's USB port, with the device busy, it may not
+        Intent battery = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+        boolean plugged = battery != null && battery.getIntExtra(BatteryManager.EXTRA_PLUGGED, 0) != 0;
         String text = getString(installer != null ? R.string.build_confirm_installer : R.string.build_confirm)
-                + (charging ? "" : "\n\n" + getString(R.string.build_confirm_charger));
+                + (plugged ? "" : "\n\n" + getString(R.string.build_confirm_charger));
         AlertDialog d = new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle(R.string.build_confirm_title)
                 .setMessage(text)
