@@ -24,7 +24,7 @@
         android:allowBackup="false"
         android:hardwareAccelerated="true"
         android:extractNativeLibs="true"
-        android:appComponentFactory=".AppFactory"
+        android:appComponentFactory="io.github.zhouwuqi.noitadroid.AppFactory"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
         <!-- The launcher's: checks that the game can start (GameCheck), goes straight to NoitaActivity when it can,
              and shows what's missing when it can't. -->
