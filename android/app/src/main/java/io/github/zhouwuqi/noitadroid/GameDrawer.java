@@ -29,8 +29,9 @@ import java.util.List;
 
 /**
  * The in-game menu: a swipe from the screen's left edge pulls it out over the game, which stands still meanwhile
- * (Host.hold). It has the saves (export, import), swapped gamepad buttons (PadMap), the performance settings (Perf)
- * and the FPS and temperature display (StatsOverlay). Touch and gamepad: the D-pad or left stick moves between buttons, A presses, B goes back.
+ * (Host.hold). It has the saves (export, import), swapped gamepad buttons (PadMap), the on-screen controls and their
+ * layout (TouchControls), the performance settings (Perf) and the FPS and temperature display (StatsOverlay). Touch
+ * and gamepad: the D-pad or left stick moves between buttons, A presses, B goes back.
  */
 final class GameDrawer {
     interface Host {
@@ -50,32 +51,38 @@ final class GameDrawer {
     }
 
     static final int REQ_EXPORT = 7101, REQ_IMPORT = 7102;
-    private static final int MAIN = 0, PAD = 1, PAD_TARGET = 2, IMPORT = 3, PERF = 4;
+    private static final int MAIN = 0, PAD = 1, PAD_TARGET = 2, IMPORT = 3, PERF = 4, TOUCH = 5;
 
     private final Activity a;
     private Context t;  // for strings: the app's language (Lang), which the menu itself switches
     private final Host host;
     private final PadMap pad;
     private final StatsOverlay stats;
+    private final TouchControls controls;
+    private final TouchOverlay touch;
+    private final TouchEditor editor;
     private final FrameLayout root;
     private final View scrim;
     private final ScrollView panel;
     private final LinearLayout content;
     private final int panelWidth, edge, slop;
 
-    private boolean shown, tracking, dragging, busy;
+    private boolean shown, tracking, dragging, busy, editing;
     private float downX;
     private int page = MAIN, padSource;
     private CharSequence saveMessage;
     private int saveColor = DIM;
     private SaveTransfer.Staged staged;
 
-    GameDrawer(Activity a, FrameLayout parent, Host host, PadMap pad, StatsOverlay stats) {
+    GameDrawer(Activity a, FrameLayout parent, Host host, PadMap pad, StatsOverlay stats, TouchControls controls,
+            TouchOverlay touch) {
         this.a = a;
         t = Lang.wrap(a);
         this.host = host;
         this.pad = pad;
         this.stats = stats;
+        this.controls = controls;
+        this.touch = touch;
         int screen = a.getResources().getDisplayMetrics().widthPixels;
         panelWidth = Math.min(dp(380), screen * 9 / 20);
         edge = dp(28);
@@ -100,6 +107,7 @@ final class GameDrawer {
                 Gravity.START));
         parent.addView(root, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
+        editor = new TouchEditor(a, parent, controls, touch, this::endEdit);
     }
 
     boolean isShown() {
@@ -192,9 +200,13 @@ final class GameDrawer {
     }
 
     private void back() {
+        if (editing) {
+            endEdit();
+            return;
+        }
         switch (page) {
             case PAD_TARGET: showPad(padSource); break;
-            case PAD: case PERF: show(MAIN); break;
+            case PAD: case PERF: case TOUCH: show(MAIN); break;
             case IMPORT: cancelImport(); break;
             default: close();
         }
@@ -216,6 +228,7 @@ final class GameDrawer {
             case PAD_TARGET: renderPadTarget(); break;
             case IMPORT: renderImport(); break;
             case PERF: renderPerf(); break;
+            case TOUCH: renderTouch(); break;
             default: renderMain();
         }
     }
@@ -234,9 +247,23 @@ final class GameDrawer {
         hint(swaps.isEmpty() ? t.getString(R.string.menu_pad_default) : t.getString(R.string.menu_pad_swapped, swaps));
         buttons(button(R.string.menu_pad_edit, v -> showPad(0)));
 
+        section(R.string.menu_touch);
+        hint(t.getString(touchState()));
+        buttons(button(R.string.menu_touch_edit, v -> show(TOUCH)));
+
         section(R.string.menu_perf);
         hint(t.getString(R.string.menu_perf_cores, coresLabel(Perf.cores(a))));
         buttons(button(R.string.menu_perf_edit, v -> show(PERF)));
+
+        if (GameCheck.canAddSound(a)) {
+            section(R.string.menu_sound);
+            hint(t.getString(R.string.menu_sound_hint));
+            buttons(button(R.string.menu_sound_setup, v -> {
+                GameCheck.setSilent(a, false);
+                busy = true;
+                host.restart();
+            }));
+        }
 
         section(R.string.menu_display);
         buttons(button(stats.isOn() ? R.string.menu_overlay_on : R.string.menu_overlay_off, v -> {
@@ -298,7 +325,7 @@ final class GameDrawer {
             b.setTag(mode);
             content.addView(b, Ui.full(0, dp(10), 0, 0));
             hint(t.getString(Perf.SPLIT.equals(mode) ? R.string.perf_split_hint
-                    : Perf.FAST.equals(mode) ? R.string.perf_fast_hint : R.string.perf_system_hint));
+                    : Perf.BOOST.equals(mode) ? R.string.perf_boost_hint : R.string.perf_system_hint));
         }
         if (Perf.modes().size() > 1) {
             content.addView(Ui.text(a, t.getString(R.string.perf_applies), 13, TEXT, false), Ui.full(0, dp(14), 0, 0));
@@ -306,9 +333,130 @@ final class GameDrawer {
         buttons(button(R.string.menu_back, v -> show(MAIN)));
     }
 
+    private int touchState() {
+        switch (controls.mode()) {
+            case TouchControls.ON: return R.string.touch_state_on;
+            case TouchControls.OFF: return R.string.touch_state_off;
+            default: return touch.isActive() ? R.string.touch_state_auto_shown : R.string.touch_state_auto_hidden;
+        }
+    }
+
+    private void renderTouch() {
+        content.addView(Ui.text(a, t.getString(R.string.touch_title), 20, ACCENT, true));
+        hint(t.getString(touchState()));
+        buttons(touchMode(TouchControls.AUTO, R.string.touch_mode_auto), touchMode(TouchControls.ON, R.string.touch_mode_on),
+                touchMode(TouchControls.OFF, R.string.touch_mode_off));
+
+        section(R.string.touch_layout);
+        hint(t.getString(R.string.touch_layout_hint));
+        Button edit = button(R.string.touch_edit, v -> startEdit());
+        edit.setTag("edit");
+        buttons(edit);
+        stepper(t.getString(R.string.touch_size, Math.round(controls.size() * 100)), "size", n -> {
+            controls.changeSize(n);
+            touch.invalidate();
+        });
+        stepper(t.getString(R.string.touch_opacity, controls.opacity()), "opacity", n -> {
+            controls.changeOpacity(n);
+            touch.invalidate();
+        });
+
+        section(R.string.touch_which);
+        LinearLayout row = null;
+        int col = 0;
+        for (TouchControls.Control k : controls.all) {
+            if (col++ % 2 == 0) {
+                row = new LinearLayout(a);
+                content.addView(row, Ui.full(0, dp(6), 0, 0));
+            }
+            Button b = button(t.getString(k.label) + (k.shown ? "   ✓" : ""), v -> {
+                k.shown = !k.shown;
+                controls.save(k);
+                touch.invalidate();
+                render();
+                refocus(k.id);
+            });
+            if (k.shown) b.setTextColor(ACCENT);
+            b.setTag(k.id);
+            LinearLayout.LayoutParams half = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+            if (col % 2 == 0) half.leftMargin = dp(8);
+            row.addView(b, half);
+        }
+
+        buttons(button(R.string.touch_reset, v -> {
+            controls.resetLayout();
+            touch.invalidate();
+            render();
+            focusFirst();
+        }), button(R.string.menu_back, v -> show(MAIN)));
+    }
+
+    private Button touchMode(int mode, int label) {
+        boolean on = controls.mode() == mode;
+        Button b = button(t.getString(label) + (on ? " ✓" : ""), v -> {
+            controls.setMode(mode);
+            touch.refresh();
+            render();
+            refocus("mode" + mode);
+        });
+        if (on) b.setTextColor(ACCENT);
+        b.setTag("mode" + mode);
+        return b;
+    }
+
+    /** A value with a button either side of it. */
+    private void stepper(String value, String tag, java.util.function.IntConsumer change) {
+        TextView label = Ui.text(a, value, 14, TEXT, false);
+        label.setGravity(Gravity.CENTER);
+        Button less = button("−", v -> {
+            change.accept(-1);
+            render();
+            refocus(tag + "-");
+        });
+        less.setTag(tag + "-");
+        Button more = button("+", v -> {
+            change.accept(1);
+            render();
+            refocus(tag + "+");
+        });
+        more.setTag(tag + "+");
+        LinearLayout row = new LinearLayout(a);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.addView(less, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        row.addView(label, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 2));
+        row.addView(more, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+        content.addView(row, Ui.full(0, dp(8), 0, 0));
+    }
+
+    private void refocus(Object tag) {
+        View again = content.findViewWithTag(tag);
+        if (again != null) again.requestFocus();
+    }
+
+    /** The menu slides away, the game still held, and the controls can be dragged about (TouchEditor). */
+    private void startEdit() {
+        editing = true;
+        panel.animate().translationX(-panelWidth).setDuration(140).withEndAction(() -> {
+            root.setVisibility(View.GONE);
+            editor.show(t);
+        }).start();
+        scrim.animate().alpha(0).setDuration(140).start();
+    }
+
+    private void endEdit() {
+        editing = false;
+        editor.hide();
+        page = TOUCH;
+        render();
+        root.setVisibility(View.VISIBLE);
+        panel.animate().translationX(0).setDuration(160).start();
+        scrim.animate().alpha(1).setDuration(160).start();
+        panel.post(() -> refocus("edit"));
+    }
+
     private String coresLabel(String mode) {
         return t.getString(Perf.SPLIT.equals(mode) ? R.string.perf_split
-                : Perf.FAST.equals(mode) ? R.string.perf_fast : R.string.perf_system);
+                : Perf.BOOST.equals(mode) ? R.string.perf_boost : R.string.perf_system);
     }
 
     private void showPad(int focus) {

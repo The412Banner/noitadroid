@@ -46,7 +46,7 @@ public class BuildService extends Service {
     static final String EXTRA_INSTALLER = "installer";
     private static final String CHANNEL = "build";
     private static final int NOTIFICATION = 1;
-    private static final int UNPACK_SHARE = 180;  // of 1000: unpacking takes about 3 of 15 minutes
+    private static final int UNPACK_SHARE = 150;  // of 1000: unpacking takes about 3 of 19 minutes
     private static final Pattern PERCENT = Pattern.compile("(\\d+(?:\\.\\d+)?)%");
 
     private static volatile boolean running, cancelled;

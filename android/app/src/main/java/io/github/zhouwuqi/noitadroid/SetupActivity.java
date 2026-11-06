@@ -38,7 +38,8 @@ import android.widget.TextView;
 import java.io.File;
 
 /**
- * The launcher's activity. When the game can start (GameCheck), it goes straight to NoitaActivity and is never seen;
+ * The launcher's activity. When the game can start (GameCheck), it goes straight to NoitaActivity and is never seen,
+ * unless FMOD can still be imported and the user hasn't chosen to play without it;
  * otherwise it shows what's missing, with what to do about each item, and checks again whenever it comes back.
  * When the app builds the game's code on the device (NativeBuild), it starts that build (BuildService) and shows its
  * progress; from GOG's installer, when it finds one, it unpacks the game first.
@@ -67,7 +68,7 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        if (savedInstanceState == null && !BuildService.running() && new GameCheck(this).ready()) {
+        if (savedInstanceState == null && !BuildService.running() && new GameCheck(this).startsAtOnce(this)) {
             startGame();  // not when recreated for a language
             return;
         }
@@ -78,7 +79,7 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (!BuildService.running() && new GameCheck(this).ready()) startGame();
+        if (!BuildService.running() && new GameCheck(this).startsAtOnce(this)) startGame();
     }
 
     /**
@@ -90,7 +91,7 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
     protected void onResume() {
         super.onResume();
         if (rows == null || isFinishing()) return;
-        if (resumedBefore && !BuildService.running() && !NativeBuild.STATUS.done && new GameCheck(this).ready()) {
+        if (resumedBefore && !BuildService.running() && !NativeBuild.STATUS.done && new GameCheck(this).startsAtOnce(this)) {
             startGame();
             return;
         }
@@ -453,7 +454,10 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
         left.addView(progress, Ui.wrap(0, dp(4), 0, 0));
         left.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1));
         LinearLayout buttons = new LinearLayout(this);
-        start = Ui.button(this, getString(R.string.start), v -> startGame());
+        start = Ui.button(this, getString(R.string.start), v -> {
+            GameCheck.setSilent(this, true);  // if it's still without sound: the user chose that, don't ask again
+            startGame();
+        });
         recheck = Ui.button(this, getString(R.string.recheck), v -> show());
         cancel = Ui.button(this, getString(R.string.build_cancel), v -> BuildService.cancel());
         buttons.addView(start);

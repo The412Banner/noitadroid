@@ -117,6 +117,25 @@ final class GameCheck {
         }
     }
 
+    /**
+     * This app can import FMOD but hasn't yet, so the game would be silent. The setup screen stays up for it, once:
+     * until the user starts the game anyway (setSilent).
+     */
+    static boolean canAddSound(Context c) {
+        return NativeBuild.onDevice(NativeBuild.properties(c)) && FmodImport.version(c) == null
+                && !new File(c.getApplicationInfo().nativeLibraryDir, "libfmodstudio.so").exists();
+    }
+
+    /** Whether the user has chosen to play without sound. Written at once: the caller may be about to end the process. */
+    static void setSilent(Context c, boolean silent) {
+        c.getSharedPreferences("game", Context.MODE_PRIVATE).edit().putBoolean("silent", silent).commit();
+    }
+
+    /** The launcher can go straight into the game: it can start, and there's nothing to ask about sound. */
+    boolean startsAtOnce(Context c) {
+        return ready() && (!canAddSound(c) || c.getSharedPreferences("game", Context.MODE_PRIVATE).getBoolean("silent", false));
+    }
+
     /** Everything the game needs; sound is optional. */
     boolean ready() {
         return access == State.OK && files == State.OK && version == State.OK && nativeCode == State.OK;

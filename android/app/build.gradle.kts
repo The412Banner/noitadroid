@@ -27,8 +27,8 @@ android {
         applicationId = "io.github.zhouwuqi.noitadroid"
         minSdk = 30  // all-files access (MANAGE_EXTERNAL_STORAGE), where the game and saves live
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.1"
+        versionCode = 4
+        versionName = "0.3.0"
         ndk { abiFilters += "arm64-v8a" }
         manifestPlaceholders["appIcon"] =
             if (!public && iconRes.resolve("mipmap-anydpi-v26/ic_launcher.xml").exists()) "@mipmap/ic_launcher"

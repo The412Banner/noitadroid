@@ -1,6 +1,7 @@
 package io.github.zhouwuqi.noitadroid;
 
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.graphics.Rect;
 import android.os.Bundle;
@@ -25,11 +26,12 @@ import java.util.List;
  * shared storage (/sdcard/noitadroid), which needs all-files access: SetupActivity, the launcher's, sees to that and
  * the game files before it starts this one. FMOD's Java side starts before the native engine.
  *
- * Over SDL's view of the game it puts the in-game menu (GameDrawer, from the left edge) and the FPS display
- * (StatsOverlay); gamepad keys pass through PadMap's swaps on their way to SDL.
+ * Over SDL's view of the game it puts the on-screen controls (TouchOverlay), the in-game menu (GameDrawer, from the
+ * left edge) and the FPS display (StatsOverlay); gamepad keys pass through PadMap's swaps on their way to SDL.
  */
 public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
     private static final String TAG = "noitadroid";
+    private static final String RELAUNCH_ARGS = "args";
 
     /** runtime/android_main.c: the frames the game has shown, and holding it at a frame's end (runtime/gles.c). */
     static native long nativeFrames();
@@ -42,6 +44,7 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
 
     private PadMap pad;
     private GameDrawer drawer;
+    private TouchOverlay touch;
     private boolean held;
 
     @Override
@@ -59,8 +62,12 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
         mLayout.addView(overlays, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         pad = new PadMap(this);
+        TouchControls controls = new TouchControls(this);
+        touch = new TouchOverlay(this, controls);
+        overlays.addView(touch, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
         StatsOverlay stats = new StatsOverlay(this, overlays, NoitaActivity::nativeFrames);
-        drawer = new GameDrawer(this, overlays, this, pad, stats);
+        drawer = new GameDrawer(this, overlays, this, pad, stats, controls, touch);
         // Gesture navigation's back swipe starts at the same edge: keep it off the middle of the left edge (Android
         // grants an app at most 200 dp of each edge), so a swipe there opens the menu.
         mLayout.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
@@ -83,6 +90,7 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
         if (drawer != null && drawer.interceptTouch(ev)) return true;
+        if (drawer != null && !drawer.isShown() && touch.onGameTouch(ev)) return true;
         return super.dispatchTouchEvent(ev);
     }
 
@@ -98,6 +106,7 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
     // event loop, which the game must reach: the hold lifts meanwhile and comes back with the app.
     @Override
     protected void onPause() {
+        if (touch != null) touch.releaseAll();
         if (held) nativeHold(false, 0);
         super.onPause();
     }
@@ -132,6 +141,23 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
     public void restart() {
         startActivity(new Intent(this, RestartActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         Process.killProcess(Process.myPid());  // held at a frame's end: the game isn't writing its save
+    }
+
+    /**
+     * The game starting itself again, its last act before exiting: runtime/android_main.c, on the game's thread. The
+     * next start gets the command's arguments, as CreateProcessW would have passed them: split at spaces, and without
+     * the program's name.
+     */
+    @SuppressWarnings("unused")
+    void relaunch(String cmd) {
+        List<String> args = words(cmd);
+        if (!args.isEmpty()) args.remove(0);
+        relaunchPrefs().edit().putString(RELAUNCH_ARGS, String.join(" ", args)).commit();  // before this process ends
+        restart();
+    }
+
+    private SharedPreferences relaunchPrefs() {
+        return getSharedPreferences("relaunch", MODE_PRIVATE);
     }
 
     @Override
@@ -217,6 +243,7 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
      * "--fmod-dir" (FMOD's libraries: the APK's, or the imported ones) and "--env NAME=VALUE" (the Perf settings).
      * A debuggable build also takes more from its intent, for benchmarks over adb (tools/android/perfbench.sh):
      * "noitadroid.env" (NAME=VALUE ..., after the settings, so it wins) and "noitadroid.args" (the game's own).
+     * The game's own arguments also come from its relaunch, once.
      */
     @Override
     protected String[] getArguments() {
@@ -225,12 +252,16 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
                 "--game", GameCheck.gameDir(this).getPath(),
                 "--fmod-dir", fmod != null ? fmod.getPath() : getApplicationInfo().nativeLibraryDir));
         for (String e : Perf.env(this)) args.addAll(Arrays.asList("--env", e));
+        SharedPreferences relaunch = relaunchPrefs();
+        List<String> own = words(relaunch.getString(RELAUNCH_ARGS, null));
+        relaunch.edit().clear().commit();
         Intent in = getIntent();
         boolean debug = (getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0;
         if (debug && in != null) {
             for (String e : words(in.getStringExtra("noitadroid.env"))) args.addAll(Arrays.asList("--env", e));
-            args.addAll(words(in.getStringExtra("noitadroid.args")));
+            own.addAll(words(in.getStringExtra("noitadroid.args")));
         }
+        args.addAll(own);
         return args.toArray(new String[0]);
     }
 

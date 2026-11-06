@@ -42,6 +42,9 @@
     <string name="menu_perf">性能</string>
     <string name="menu_perf_cores">处理器核心：%1$s</string>
     <string name="menu_perf_edit">性能设置…</string>
+    <string name="menu_sound">声音</string>
+    <string name="menu_sound_hint">游戏现在没有声音：还没导入 FMOD。设置时游戏会重启，所以请先在游戏自己的菜单里“保存并退出”。</string>
+    <string name="menu_sound_setup">设置声音</string>
     <string name="menu_display">显示</string>
     <string name="menu_overlay_on">FPS 和温度：开</string>
     <string name="menu_overlay_off">FPS 和温度：关</string>
@@ -50,6 +53,38 @@
     <string name="menu_back">返回</string>
     <string name="cancel">取消</string>
     <string name="list_sep">、</string>
+
+    <string name="menu_touch">触控按键</string>
+    <string name="menu_touch_edit">触控按键设置…</string>
+    <string name="touch_title">触控按键</string>
+    <string name="touch_state_on">已开启。</string>
+    <string name="touch_state_off">已关闭：点屏幕相当于鼠标。</string>
+    <string name="touch_state_auto_shown">自动：没有连接手柄，正在显示。</string>
+    <string name="touch_state_auto_hidden">自动：已连接手柄，不显示。</string>
+    <string name="touch_mode_auto">自动</string>
+    <string name="touch_mode_on">开启</string>
+    <string name="touch_mode_off">关闭</string>
+    <string name="touch_layout">布局</string>
+    <string name="touch_layout_hint">在暂停的游戏画面上拖动按键。按键只在游玩时显示：菜单里全部隐藏，开背包时只留关闭背包的那个键。按键之外的地方点屏幕仍然相当于鼠标，可以点菜单、整理背包、指哪打哪。</string>
+    <string name="touch_edit">调整布局…</string>
+    <string name="touch_size">大小 %1$d%%</string>
+    <string name="touch_opacity">不透明度 %1$d%%</string>
+    <string name="touch_which">显示哪些按键</string>
+    <string name="touch_reset">恢复默认布局</string>
+    <string name="touch_edit_hint">拖动按键来摆放，点一下可以调大小或隐藏。</string>
+    <string name="touch_edit_selected">%1$s  %2$d%%</string>
+    <string name="touch_edit_hide">隐藏</string>
+    <string name="touch_edit_done">完成</string>
+    <string name="touch_move">移动和飞行</string>
+    <string name="touch_aim">瞄准和开火</string>
+    <string name="touch_kick">踢</string>
+    <string name="touch_throw">投掷</string>
+    <string name="touch_interact">互动</string>
+    <string name="touch_inventory">背包</string>
+    <string name="touch_prev">上一个物品</string>
+    <string name="touch_next">下一个物品</string>
+    <string name="touch_pause">暂停</string>
+    <string name="touch_fly">飞行</string>
 
     <string name="pad_title">手柄按键互换</string>
     <string name="pad_hint">先选一个按键，再选它要当作哪个键用，两个键会互换。只对游戏生效；摇杆、十字键和扳机不受影响。游戏自带的设置里也能改键位。</string>
@@ -64,10 +99,10 @@
     <string name="perf_device_1">本机的 %1$d 个核心都一样，没有可选的。</string>
     <string name="perf_system">系统分配</string>
     <string name="perf_system_hint">由 Android 决定游戏线程放在哪个核心上。</string>
-    <string name="perf_split">超大核给主线程（推荐）</string>
+    <string name="perf_split">超大核给主线程</string>
     <string name="perf_split_hint" formatted="false">游戏主线程独占最快的核心，模拟线程用其余核心。实测快 8–16%。</string>
-    <string name="perf_fast">全速</string>
-    <string name="perf_fast_hint" formatted="false">同上，主线程等待时也不休眠，让最快的核心保持最高频率。实测快 14–25%，但更热、更费电。</string>
+    <string name="perf_boost">超大核身兼两职（推荐）</string>
+    <string name="perf_boost_hint" formatted="false">同上，再加一个模拟线程，在主线程等待时使用最快的核心。实测再快 8–13%，温度略高。</string>
     <string name="perf_applies">立即生效。模拟线程的数量在下次启动游戏时调整。</string>
 
     <string name="export_running">正在导出…</string>
@@ -90,13 +125,13 @@
     <string name="native_title">游戏代码</string>
     <string name="native_ok">已在本机用你的游戏构建好。</string>
     <string name="native_waiting">游戏文件就绪后在本机构建。</string>
-    <string name="native_missing">游戏代码要用你自己的游戏在这台设备上生成，大约 12 分钟，只需一次。</string>
-    <string name="native_old">这个版本的 App 需要重新构建游戏代码（大约 12 分钟）。</string>
+    <string name="native_missing">游戏代码要用你自己的游戏在这台设备上生成，大约 16 分钟，只需一次。</string>
+    <string name="native_old">这个版本的 App 需要重新构建游戏代码（大约 16 分钟）。</string>
     <string name="native_other">现有的游戏代码是用另一份游戏构建的，请用这一份重新构建。</string>
     <string name="native_action">在本机构建</string>
     <string name="build_confirm_title">构建游戏代码？</string>
-    <string name="build_confirm">App 会把你的 noita.exe 转换成这台设备能运行的代码，大约 12 分钟。期间处理器满负荷运行，设备会发热，最好取下保护壳。可以切到别的 App，但不要从最近任务里关掉 Noita。构建中断的话，下次会从中断处继续。</string>
-    <string name="build_confirm_installer">App 会先把 GOG 的安装包解包到「内部存储/noitadroid/Noita」（大约 3 分钟，1.7 GB），再把你的 noita.exe 转换成这台设备能运行的代码（大约 12 分钟）。期间处理器满负荷运行，设备会发热，最好取下保护壳。可以切到别的 App，但不要从最近任务里关掉 Noita。中断的话，下次会从中断处继续。</string>
+    <string name="build_confirm">App 会把你的 noita.exe 转换成这台设备能运行的代码，大约 16 分钟。期间处理器满负荷运行，设备会发热，最好取下保护壳。可以切到别的 App，但不要从最近任务里关掉 Noita。构建中断的话，下次会从中断处继续。</string>
+    <string name="build_confirm_installer">App 会先把 GOG 的安装包解包到「内部存储/noitadroid/Noita」（大约 3 分钟，1.7 GB），再把你的 noita.exe 转换成这台设备能运行的代码（大约 16 分钟）。期间处理器满负荷运行，设备会发热，最好取下保护壳。可以切到别的 App，但不要从最近任务里关掉 Noita。中断的话，下次会从中断处继续。</string>
     <string name="build_confirm_charger">没有接充电器，构建很耗电，最好插上。</string>
     <string name="build_confirm_go">开始构建</string>
     <string name="build_cancel">停止</string>

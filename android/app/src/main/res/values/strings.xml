@@ -45,6 +45,9 @@
     <string name="menu_perf">Performance</string>
     <string name="menu_perf_cores">CPU cores: %1$s</string>
     <string name="menu_perf_edit">Performance settings…</string>
+    <string name="menu_sound">Sound</string>
+    <string name="menu_sound_hint">The game is silent: FMOD isn\'t imported yet. Setting it up restarts the game, so first use Save &amp; Quit in the game\'s own menu.</string>
+    <string name="menu_sound_setup">Set up sound</string>
     <string name="menu_display">Display</string>
     <string name="menu_overlay_on">FPS and temperatures: on</string>
     <string name="menu_overlay_off">FPS and temperatures: off</string>
@@ -53,6 +56,38 @@
     <string name="menu_back">Back</string>
     <string name="cancel">Cancel</string>
     <string name="list_sep">", "</string>
+
+    <string name="menu_touch">Touch controls</string>
+    <string name="menu_touch_edit">Touch controls…</string>
+    <string name="touch_title">Touch controls</string>
+    <string name="touch_state_on">On.</string>
+    <string name="touch_state_off">Off: touching the screen acts as a mouse.</string>
+    <string name="touch_state_auto_shown">Auto: shown, as no gamepad is connected.</string>
+    <string name="touch_state_auto_hidden">Auto: hidden, as a gamepad is connected.</string>
+    <string name="touch_mode_auto">Auto</string>
+    <string name="touch_mode_on">On</string>
+    <string name="touch_mode_off">Off</string>
+    <string name="touch_layout">Layout</string>
+    <string name="touch_layout_hint">Drag the controls about over the paused game. They show while you play; the menus have none in their way, and the inventory only the button that closes it. Touching anywhere else stays a mouse: for menus, the inventory and pointing at things.</string>
+    <string name="touch_edit">Edit layout…</string>
+    <string name="touch_size">Size %1$d%%</string>
+    <string name="touch_opacity">Opacity %1$d%%</string>
+    <string name="touch_which">Which controls</string>
+    <string name="touch_reset">Reset layout</string>
+    <string name="touch_edit_hint">Drag a control. Tap one to size or hide it.</string>
+    <string name="touch_edit_selected">%1$s  %2$d%%</string>
+    <string name="touch_edit_hide">Hide</string>
+    <string name="touch_edit_done">Done</string>
+    <string name="touch_move">Move and fly</string>
+    <string name="touch_aim">Aim and fire</string>
+    <string name="touch_kick">Kick</string>
+    <string name="touch_throw">Throw</string>
+    <string name="touch_interact">Interact</string>
+    <string name="touch_inventory">Inventory</string>
+    <string name="touch_prev">Previous item</string>
+    <string name="touch_next">Next item</string>
+    <string name="touch_pause">Pause</string>
+    <string name="touch_fly">Fly</string>
 
     <string name="pad_title">Swap gamepad buttons</string>
     <string name="pad_hint">Pick a button, then the one it should act as: the two swap. For the game only; the sticks, D-pad and triggers stay. The game\'s own settings can rebind its actions too.</string>
@@ -67,10 +102,10 @@
     <string name="perf_device_1">This device\'s %1$d cores are all alike: there\'s nothing to choose.</string>
     <string name="perf_system">Android decides</string>
     <string name="perf_system_hint">Android puts the game\'s threads on any core.</string>
-    <string name="perf_split">Prime core for the main thread (recommended)</string>
+    <string name="perf_split">Prime core for the main thread</string>
     <string name="perf_split_hint" formatted="false">The game\'s main thread has the fastest core to itself, its simulation threads the others. 8–16% faster in our tests.</string>
-    <string name="perf_fast">Full speed</string>
-    <string name="perf_fast_hint" formatted="false">As above, and the main thread doesn\'t sleep while it waits, which keeps the fastest core at its top clock. 14–25% faster, but hotter and harder on the battery.</string>
+    <string name="perf_boost">Prime core does both (recommended)</string>
+    <string name="perf_boost_hint" formatted="false">As above, and one more simulation thread uses the fastest core while the main thread waits. Another 8–13% faster in our tests, and a little hotter.</string>
     <string name="perf_applies">Applies at once. The number of simulation threads follows the next time the game starts.</string>
 
     <string name="export_running">Exporting…</string>
@@ -93,13 +128,13 @@
     <string name="native_title">Game code</string>
     <string name="native_ok">Built on this device, from your copy of the game.</string>
     <string name="native_waiting">Built on this device once the game files are there.</string>
-    <string name="native_missing">The game\'s code is made from your own copy of the game, here on this device. It takes about 12 minutes, once.</string>
-    <string name="native_old">This version of the app needs the game\'s code built again (about 12 minutes).</string>
+    <string name="native_missing">The game\'s code is made from your own copy of the game, here on this device. It takes about 16 minutes, once.</string>
+    <string name="native_old">This version of the app needs the game\'s code built again (about 16 minutes).</string>
     <string name="native_other">It was built from a different copy of the game: build it again from this one.</string>
     <string name="native_action">Build on this device</string>
     <string name="build_confirm_title">Build the game\'s code?</string>
-    <string name="build_confirm">The app turns your noita.exe into code for this device. It takes about 12 minutes, and the processor runs at full speed: the device gets hot, so take it out of its case. You can use other apps meanwhile, but don\'t close Noita from the recent apps. If the build stops, the next one goes on where it left off.</string>
-    <string name="build_confirm_installer">The app unpacks GOG\'s installer into Internal storage › noitadroid › Noita (about 3 minutes, 1.7 GB), then turns your noita.exe into code for this device (about 12 minutes). The processor runs at full speed: the device gets hot, so take it out of its case. You can use other apps meanwhile, but don\'t close Noita from the recent apps. If it stops, it goes on where it left off.</string>
+    <string name="build_confirm">The app turns your noita.exe into code for this device. It takes about 16 minutes, and the processor runs at full speed: the device gets hot, so take it out of its case. You can use other apps meanwhile, but don\'t close Noita from the recent apps. If the build stops, the next one goes on where it left off.</string>
+    <string name="build_confirm_installer">The app unpacks GOG\'s installer into Internal storage › noitadroid › Noita (about 3 minutes, 1.7 GB), then turns your noita.exe into code for this device (about 16 minutes). The processor runs at full speed: the device gets hot, so take it out of its case. You can use other apps meanwhile, but don\'t close Noita from the recent apps. If it stops, it goes on where it left off.</string>
     <string name="build_confirm_charger">The charger isn\'t connected, and building uses a lot of battery: better plug it in.</string>
     <string name="build_confirm_go">Build</string>
     <string name="build_cancel">Stop</string>

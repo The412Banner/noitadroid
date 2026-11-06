@@ -11,13 +11,15 @@ recompiled to ARM64, on Android handhelds and phones. It has no emulator and no 
 It plays on an AYANEO Pocket S (Snapdragon G3x Gen 2, Android 13):
 - Fullscreen 1920×1080, with 50–60 fps in the early caves.
 - Full sound (FMOD), and the built-in gamepad and the touchscreen both work.
+- On-screen touch controls, for phones: sticks and buttons you can lay out yourself, out of the way in menus and the
+  inventory. Also tried on an OPPO Find X9 Ultra (Snapdragon 8 Elite Gen 5, Android 16).
 - An in-game menu with save export/import, gamepad button swaps, performance settings, and an FPS and temperature
   display.
 
 Other devices are untested so far. Reports are welcome.
 
 > **The APK contains no game code.** You bring **your own copy of Noita from GOG**, and the app builds the game's
-> native code from it, on your device: about 15 minutes, once. That code is made from the game, so it stays on your
+> native code from it, on your device: about 20 minutes, once. That code is made from the game, so it stays on your
 > device: never share it. Nothing is downloaded or uploaded.
 
 ## Install
@@ -41,7 +43,7 @@ Then:
 3. **Open Noita (noitadroid).** Its first screen shows what's still missing:
    1. **All files access.** The app reads the game from shared storage and keeps saves there.
    2. **Install from it.** The app unpacks the installer into `Internal storage/noitadroid/Noita` (1–3 minutes), then
-      builds the game's code (about 12 minutes on a Snapdragon G3x Gen 2). The processor runs at full speed and the
+      builds the game's code (about 16 minutes on a Snapdragon G3x Gen 2). The processor runs at full speed and the
       device gets hot: plug in the charger and take it out of its case. You can use other apps meanwhile, but don't
       close Noita from the recent apps. If the build stops, the next one goes on where it left off. Afterwards the app
       offers to delete the installer.
@@ -69,16 +71,22 @@ The APKs are signed with this certificate (SHA-256):
 
 ## Playing
 
-- **Controls.** The gamepad and touch work as in the PC game: touch acts as the mouse.
+- **Controls.** A gamepad works as in the PC game, and touching the screen acts as the mouse.
+- **Touch controls.** With no gamepad connected, on-screen controls appear while you play: the left stick moves (up flies),
+  the right stick aims and, pushed past its inner ring, fires. There are buttons for kick, throw, interact, inventory,
+  previous and next item, and pause. In the menus and on the game over screen they go away, and while the inventory is
+  open only its button stays. Touching anywhere else is still the mouse: click menus, drag items, or hold to fire at a spot.
 - **The in-game menu.** Swipe right from the middle of the screen's left edge. Gesture navigation's back swipe
   keeps the rest of that edge. The game pauses while the menu is open. The menu has:
   - **Saves.** Export to a zip laid out like the Windows game's `Nolla_Games_Noita` folder. Import from such a zip,
     from Android or Windows; the current save is kept as `save00.backup-<date>`, and the game restarts.
   - **Gamepad buttons.** Swap buttons (say A and B) for the game. The game's own settings can also rebind its
     actions.
+  - **Touch controls.** Auto, on or off (on a handheld with a built-in gamepad, turn them on here). Their size and
+    opacity, which ones show, and **Edit layout**: drag them about over the paused game, and size or hide each one.
   - **Performance.** Which CPU cores the game's threads run on. By default the game's main thread has the fastest
-    core to itself: 8–16% faster than leaving it to Android, on the Pocket S. **Full speed** also keeps that core
-    from sleeping: 14–25% faster, but hotter. It applies at once.
+    core, and one more simulation thread uses it while the main thread waits: on the Pocket S, about 20–30% faster
+    than leaving it to Android, and a little hotter. It applies at once.
   - **FPS and temperatures.** A small display at the top of the screen.
   - **Language.** The app's own screens are in English; switch to Chinese here or on the first screen. The game
     has its own language setting.
@@ -95,7 +103,7 @@ The APKs are signed with this certificate (SHA-256):
 - **The first screen says the version is wrong.** Your `noita.exe` isn't GOG build 20250125-1640.
 - **The game slows down in busy places.** Noita is heavy on the CPU, and when it can't keep up it runs slower
   rather than dropping frames. Check the device's own performance mode (on the Pocket S, AYANEO's game window): a
-  balanced mode caps the clocks. In the in-game menu, Performance settings has a Full speed option.
+  balanced mode caps the clocks.
 - **No sound.** Import FMOD 2.01.x for Android (see above); other versions are refused.
 - **Gamepad trouble.** Put an empty file named `debug_input` in `/sdcard/noitadroid/`. The log then lists the
   gamepads and their axes.
@@ -123,7 +131,7 @@ with how it went.
 ### Why does the build take so long?
 
 The recompiler writes about 400 MB of C, and the device compiles it all with its own compiler. That takes about
-12 minutes on a Snapdragon G3x Gen 2, once.
+16 minutes on a Snapdragon G3x Gen 2, once.
 
 ### Do mods work?
 

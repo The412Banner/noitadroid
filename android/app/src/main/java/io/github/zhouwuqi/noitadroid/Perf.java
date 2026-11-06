@@ -20,12 +20,12 @@ import java.util.TreeMap;
  */
 final class Perf {
     /**
-     * Android places the threads; the main thread gets the fastest core to itself and the simulation threads the
-     * others; that, and the main thread doesn't sleep while it waits. Measured on the Pocket S (docs/ANDROID.zh.md):
-     * split 8-16% faster than system, fast 14-25% and a few degrees hotter.
+     * Android places the threads; the main thread gets the fastest core and the simulation threads the others; that,
+     * and one more simulation thread uses the fastest core while the main thread waits. Measured on the Pocket S
+     * (docs/ANDROID.zh.md): split 8-16% faster than system, boost 8-13% faster than split.
      */
-    static final String SYSTEM = "system", SPLIT = "split", FAST = "fast";
-    static final String DEFAULT_CORES = SPLIT;
+    static final String SYSTEM = "system", SPLIT = "split", BOOST = "boost";
+    static final String DEFAULT_CORES = BOOST;
 
     private Perf() {}
 
@@ -67,12 +67,12 @@ final class Perf {
                 : new ArrayList<>(kinds.values());
     }
 
-    /** The modes for this device: split and fast need a fastest kind of core, and more than two kinds. */
+    /** The modes for this device: split and boost need a fastest kind of core, and more than two kinds. */
     static List<String> modes() {
         List<String> m = new ArrayList<>(Collections.singletonList(SYSTEM));
         if (coreKinds().size() >= 3) {
             m.add(SPLIT);
-            m.add(FAST);
+            m.add(BOOST);
         }
         return m;
     }
