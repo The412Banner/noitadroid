@@ -183,7 +183,10 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
                 ? getString(R.string.version_wrong, check.wrongFile, GameCheck.GOG_BUILD)
                 : check.version == GameCheck.State.OK ? getString(R.string.version_ok, "steam".equals(check.game)
                         ? getString(R.string.game_steam) : getString(R.string.game_gog, GameCheck.GOG_BUILD))
-                : getString(R.string.version_waiting), 0, null, null);
+                : getString(R.string.version_waiting),
+                // Another build or folder, whenever there's a game to check: GOG's installer or a noita.exe.
+                check.version != GameCheck.State.WAITING && check.buildsOnDevice && !busy ? R.string.choose_file : 0,
+                v -> pickFile(), null);
 
         if (check.buildsOnDevice) {
             String code;
