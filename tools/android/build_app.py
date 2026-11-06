@@ -100,7 +100,15 @@ def main():
 
     files = kit_files()
     entries = {f: (ROOT / f).read_bytes() for f in files}
-    kit_version = hashlib.sha256(b"".join(f.encode() + hashlib.sha256(b).digest() for f, b in sorted(entries.items())))
+    # The kit's version: its sources, and for the libraries built into it (LuaJIT, gl4es), what they're built from
+    # rather than the archives, whose member times change with every build. A game's code built from another
+    # version is built again (NativeBuild.need, kit.content), so this changes only when what goes into it does.
+    built = {str(p.relative_to(ROOT)) for p in KIT_BUILT}
+    recipe = {name: data for name, data in entries.items() if name not in built}
+    recipe["tools/android/deps.sh"] = (ROOT / "tools/android/deps.sh").read_bytes()
+    recipe["third_party/luajit@"] = subprocess.run(["git", "rev-parse", "HEAD:third_party/luajit"], cwd=ROOT,
+                                                   capture_output=True, check=True).stdout
+    kit_version = hashlib.sha256(b"".join(f.encode() + hashlib.sha256(b).digest() for f, b in sorted(recipe.items())))
     entries["KIT_VERSION"] = kit_version.hexdigest()[:16].encode() + b"\n"
     kit = write_zip(ASSETS / "kit.zip", entries)
     data = TOOLCHAIN / "assets/toolchain"
