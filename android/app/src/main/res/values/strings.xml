@@ -165,6 +165,9 @@
     <string name="pick_no_picker">This device has no file picker.</string>
     <string name="pick_unknown">%1$s isn\'t something the app can use: choose GOG\'s installer (setup_noita_….exe), noita.exe in a game folder, or FMOD\'s Android download.</string>
     <string name="pick_no_path">The app can\'t open %1$s from there. Choose it in the storage\'s own folders (Internal storage, or the memory card).</string>
+    <string name="perf_fg">Frame generation</string>
+    <string name="perf_fg_winfg">WinFG 2×</string>
+    <string name="perf_fg_hint">A generated frame between each two of the game\'s, shown at 120 Hz: smoother motion, a frame more delay. The game itself doesn\'t run faster. Applies when the game starts again.</string>
     <string name="files_found">Not in %1$s yet. Found on this device:</string>
     <string name="files_found_other">Other copies on this device:</string>
     <string name="found_installer">GOG\'s installer: %1$s in %2$s</string>

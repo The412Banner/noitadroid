@@ -92,6 +92,11 @@ def main():
 
     for lib in [target.DEPS / "build/SDL2/libSDL2.so", *(TOOLCHAIN / "jniLibs/arm64-v8a").glob("*.so")]:
         shutil.copy2(lib, JNI / lib.name)
+    fg = target.DEPS / "build/fg/libnd_fg.so"  # frame generation (tools/android/build_fg.sh)
+    if fg.exists():
+        shutil.copy2(fg, JNI / fg.name)
+    else:
+        print(f"no {fg.relative_to(ROOT)}: the APK has no frame generation (tools/android/build_fg.sh)")
 
     files = kit_files()
     entries = {f: (ROOT / f).read_bytes() for f in files}

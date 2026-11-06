@@ -43,9 +43,20 @@ final class Perf {
         prefs(c).edit().putString("cores", mode).apply();
     }
 
+    /** Frame generation (FrameGen, WinFG 2x): off unless chosen; it applies when the game starts. */
+    static boolean frameGen(Context c) {
+        return prefs(c).getBoolean("frameGen", false);
+    }
+
+    static void setFrameGen(Context c, boolean on) {
+        prefs(c).edit().putBoolean("frameGen", on).apply();
+    }
+
     /** What the game reads at its start. */
     static List<String> env(Context c) {
-        return Collections.singletonList("NOITADROID_CORES=" + cores(c));
+        List<String> env = new ArrayList<>(Collections.singletonList("NOITADROID_CORES=" + cores(c)));
+        if (frameGen(c)) env.add("NOITADROID_FG=1");  // runtime/gles.c
+        return env;
     }
 
     /**

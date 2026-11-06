@@ -57,6 +57,7 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
         }
         super.onCreate(savedInstanceState);
         if (mBrokenLibraries || mLayout == null) return;  // SDL shows its error instead of the game
+        if (Perf.frameGen(this)) FrameGen.attach(this, mLayout);  // under SDL's view, over its surface
 
         FrameLayout overlays = new FrameLayout(this);  // over the game's surface; lets touches through
         mLayout.addView(overlays, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,

@@ -330,6 +330,18 @@ final class GameDrawer {
         if (Perf.modes().size() > 1) {
             content.addView(Ui.text(a, t.getString(R.string.perf_applies), 13, TEXT, false), Ui.full(0, dp(14), 0, 0));
         }
+        section(R.string.perf_fg);
+        boolean fg = Perf.frameGen(a);
+        Button fgButton = button(t.getString(R.string.perf_fg_winfg) + (fg ? "   ✓" : ""), v -> {
+            Perf.setFrameGen(a, !Perf.frameGen(a));
+            render();
+            View again = content.findViewWithTag("frameGen");
+            if (again != null) again.requestFocus();
+        });
+        if (fg) fgButton.setTextColor(ACCENT);
+        fgButton.setTag("frameGen");
+        content.addView(fgButton, Ui.full(0, dp(10), 0, 0));
+        hint(t.getString(R.string.perf_fg_hint));
         buttons(button(R.string.menu_back, v -> show(MAIN)));
     }
 

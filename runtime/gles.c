@@ -6,6 +6,11 @@
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#ifdef __ANDROID__
+#include <dlfcn.h>
+#endif
 
 void initialize_gl4es(void);
 
@@ -67,7 +72,25 @@ void noitadroid_hold(int on, int after) {
     pthread_mutex_unlock(&hold_lock);
 }
 
+#ifdef __ANDROID__
+// Frame generation (android/fg/ndfg.cpp, libnd_fg.so): with NOITADROID_FG=1 (the Performance page's switch,
+// FrameGen.java) each finished frame goes to it first; its own surface over the game's shows the frames.
+static void (*fg_before_swap)(void);
+static void fg_init(void) {
+    const char *on = getenv("NOITADROID_FG");
+    if (!on || strcmp(on, "1")) return;
+    void *lib = dlopen("libnd_fg.so", RTLD_NOW);  // FrameGen.java loaded it already
+    fg_before_swap = lib ? (void (*)(void))dlsym(lib, "ndfg_before_swap") : NULL;
+    fprintf(stderr, "[noitadroid] frame generation %s\n", fg_before_swap ? "on" : "unavailable (no libnd_fg.so)");
+}
+#endif
+
 void __wrap_SDL_GL_SwapWindow(SDL_Window *window) {
+#ifdef __ANDROID__
+    static pthread_once_t fg_once = PTHREAD_ONCE_INIT;
+    pthread_once(&fg_once, fg_init);
+    if (fg_before_swap) fg_before_swap();
+#endif
     __real_SDL_GL_SwapWindow(window);
     __atomic_fetch_add(&noitadroid_frames, 1, __ATOMIC_RELAXED);
     if (!__atomic_load_n(&hold, __ATOMIC_ACQUIRE)) return;

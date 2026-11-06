@@ -43,6 +43,9 @@ jobs:
       - name: SDL2 and gl4es
         run: tools/android/deps.sh
 
+      - name: Frame generation (libnd_fg.so)
+        run: tools/android/build_fg.sh
+
       - name: Toolchain from the upstream APK
         run: |
           curl -fsSL -o "$RUNNER_TEMP/upstream.apk" "$UPSTREAM_APK"

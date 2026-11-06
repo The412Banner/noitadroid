@@ -296,6 +296,22 @@ Snapdragon 8 Elite Gen 5 (SM8850, 2×4.61 GHz + 6×3.63 GHz), Android 16, 2376×
 
 Each scene was run only once. Temperatures and clocks weren't recorded (`perfbench.sh`'s sampling reads no data on this device), and giving the main thread the prime core to itself wasn't tried.
 
+## Frame generation (this fork)
+
+WinFG 2× ([win-fg](https://github.com/The412Banner/win-fg)'s core, MIT, in `third_party/win-fg`), on the
+Performance page, off by default. It makes no frame the game draws faster: it puts a generated frame between each
+two, for smoother motion at a frame more delay. Noita's world moves one step per frame, so below 60 fps the game is
+still in slow motion; it helps most where the game holds 40–60 fps.
+
+- `runtime/gles.c`: with `NOITADROID_FG=1` each swap first calls `ndfg_before_swap` in `libnd_fg.so`.
+- `android/fg/ndfg.cpp` (`libnd_fg.so`, built with the NDK by `tools/android/build_fg.sh`): the window's back
+  buffer is blitted into one of three AHardwareBuffers with a native fence. A thread imports the newest into
+  Vulkan (the device's own driver), copies it into a two-frame ring (flipped), runs win-fg between it and the frame
+  before (alpha 0.35), and presents the generated and the real frame through a FIFO swapchain, asking for 120 Hz.
+- `FrameGen.java`: the surface it presents to, a media overlay over SDL's surface and under the window (the touch
+  controls and the menu stay on top; touches go to SDL's view). The game's own swap still happens under it, so the
+  game is paced as without frame generation, and when Vulkan can't do it the game shows as usual.
+
 ## Device tests (no game files needed)
 
 Both test sets are built in the project folder on the 4TB drive; `adb` is in `/opt/android-sdk/platform-tools/`.

@@ -162,6 +162,9 @@
     <string name="pick_no_picker">这台设备没有文件选择器。</string>
     <string name="pick_unknown">App 用不了 %1$s。请选择 GOG 的安装包（setup_noita_….exe）、游戏文件夹里的 noita.exe，或者 FMOD 的 Android 版压缩包。</string>
     <string name="pick_no_path">App 没法从那里打开 %1$s，请从存储自己的文件夹（内部存储或存储卡）里选择。</string>
+    <string name="perf_fg">插帧</string>
+    <string name="perf_fg_winfg">WinFG 2×</string>
+    <string name="perf_fg_hint">在游戏的每两帧之间生成一帧，以 120 Hz 显示：画面更流畅，延迟多一帧。游戏本身不会变快。下次启动游戏时生效。</string>
     <string name="files_found">%1$s 里还没有游戏。在这台设备上找到了：</string>
     <string name="files_found_other">这台设备上的其他游戏副本：</string>
     <string name="found_installer">GOG 的安装程序：%2$s 中的 %1$s</string>
