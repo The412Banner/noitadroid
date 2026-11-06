@@ -8,6 +8,8 @@
 -- biome there (a wrong spot writes "fail ..." and ends the run), spawns waves of jungle enemies around the player
 -- and sets off fire and TNT at fixed frames. It starts measuring later than the other scenes, after the world
 -- around the new position has streamed in.
+-- Scene "coal" is the second biome as a player meets it: nothing added, the biome's own enemies and materials, with
+-- the player moved on every 3 s (game time), so that new chunks stream in too.
 -- The start and end of the measured frames are also marked in perfbench_frames.txt, which mina4mac's
 -- MINA4MAC_FRAMELOG appends per-frame CPU times to.
 -- Start it with `-no_logo_splashes -gamemode 0` so no menu clicks are needed; don't touch the controls.
@@ -34,7 +36,7 @@ local WARMUP = 120        -- frames after spawn: start measuring
 -- jungle: teleport at LOAD_AT, move to open space at SETTLE_AT, first enemy wave at MOBS_AT
 local SETTLE_AT, MOBS_AT = 180, 200
 local JUNGLE_X, JUNGLE_Y = -768, 6912  -- biome map pixel (33, 27): Underground Jungle (data/biome/rainforest.xml)
-if scene == "jungle" then WARMUP = 360 end
+if scene == "jungle" or scene == "coal" then WARMUP = 360 end
 local FRAMES = 1800       -- frames measured (30 s at 60 fps)
 
 local spawn_frame, px, py
@@ -142,6 +144,25 @@ function OnWorldPostUpdate()
 				EntityLoad("data/entities/projectiles/deck/tntbox.xml", px - side * 250, py - 100)
 			end
 			if t == 0 then out("load") end
+		end
+	end
+	if scene == "coal" then
+		local player = EntityGetWithTag("player_unit")[1]
+		if n == LOAD_AT and player then
+			LoadGameEffectEntityTo(player, "data/entities/misc/effect_protection_all.xml")
+			local y = 512
+			while y < 5120 and BiomeMapGetName(px, y) ~= "$biome_excavationsite" do y = y + 64 end  -- the Coal Pits
+			if y >= 5120 then out("fail no coal pits below the start") ; out("done") ; spawn_frame = nil ; return end
+			py = y + 192
+			EntitySetTransform(player, px, py)
+			out(string.format("teleport %.0f,%.0f biome %s", px, py, BiomeMapGetName(px, py)))
+		elseif player and (n == SETTLE_AT or (n > WARMUP and (n - WARMUP) % 180 == 0)) then
+			local x, y = open_spot(n == SETTLE_AT and px or px + 128, py)
+			if x then
+				px, py = x, y
+				EntitySetTransform(player, px, py)
+			end
+			if n == SETTLE_AT then out(string.format("spot %.0f,%.0f biome %s", px, py, BiomeMapGetName(px, py))) ; out("load") end
 		end
 	end
 	if scene == "heavy" and n > LOAD_AT and n <= WARMUP + FRAMES then

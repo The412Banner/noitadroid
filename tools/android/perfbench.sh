@@ -7,7 +7,7 @@
 # battery. install backs up save00 (a run deletes the world in progress) and turns the mod sandbox off; remove
 # puts both back. The mod is enabled only during a run.
 #   tools/android/perfbench.sh install
-#   SCENE=flood|heavy|jungle tools/android/perfbench.sh run <out|-> [NAME=VALUE ...]   the summary to <out>; env
+#   SCENE=flood|heavy|jungle|coal tools/android/perfbench.sh run <out|-> [NAME=VALUE ...]   the summary to <out>; env
 #                                                                                     vars for the game
 #   tools/android/perfbench.sh remove
 # Keep the device on its charger, its screen on and untouched, and compare interleaved runs: thermals drift.

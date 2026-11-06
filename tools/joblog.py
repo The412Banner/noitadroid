@@ -80,7 +80,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("log")
     ap.add_argument("--framelog")
+    ap.add_argument("--ecores", type=int, default=2, help="how many of the lowest-numbered CPUs are the slow kind")
     a = ap.parse_args()
+    E = a.ecores
     ev = load(a.log)
     lo, hi, nf = window(ev, a.framelog)
     wall = hi - lo
@@ -124,7 +126,7 @@ def main():
         busy = sum(overlap(j[3], j[4], w[2], w[3]) for j in js if j[0] in pool)
         rows.append((w[1], w[3] - w[2], len(js), big[4] - big[3], sum(j[4] - j[3] for j in js),
                      max(0.0, w[3] - last[4]), busy / (nworkers * max(1e-9, w[3] - w[2])),
-                     last[6] < 2 or last[7] < 2, max(0.0, big[4] - max(big[3], w[2]))))
+                     last[6] < E or last[7] < E, max(0.0, big[4] - max(big[3], w[2]))))
     print(f"{'site':>10} {'n/frame':>7} {'wait ms':>8} {'% main':>6} {'jobs':>5} {'longest µs':>10} {'sum µs':>8} {'late µs':>7} {'util':>5} {'wait µs':>7} {'tail':>5} {'E last':>6}")
     agg = collections.defaultdict(list)
     for r in rows:
@@ -180,13 +182,13 @@ def main():
     for j in jobs:
         core_t[j[6]] += j[4] - j[3]
     print("job time by core: " + ", ".join(f"{c}:{100 * t / busy:.1f}%" for c, t in sorted(core_t.items())))
-    e = [j for j in jobs if j[6] < 2]
-    migr = sum(1 for j in jobs if (j[6] < 2) != (j[7] < 2))
+    e = [j for j in jobs if j[6] < E]
+    migr = sum(1 for j in jobs if (j[6] < E) != (j[7] < E))
     print(f"jobs started on an E-core: {100 * len(e) / max(1, len(jobs)):.1f}% ({100 * sum(j[4] - j[3] for j in e) / busy:.1f}% of job time); "
           f"moved between E and P during a job: {100 * migr / max(1, len(jobs)):.1f}%")
     for k, _ in sorted(kinds.items(), key=lambda kv: -sum(kv[1]))[:3]:
-        pe = [j[4] - j[3] for j in jobs if (j[2] or j[1]) == k and j[6] >= 2 and j[7] >= 2]
-        ee = [j[4] - j[3] for j in jobs if (j[2] or j[1]) == k and j[6] < 2 and j[7] < 2]
+        pe = [j[4] - j[3] for j in jobs if (j[2] or j[1]) == k and j[6] >= E and j[7] >= E]
+        ee = [j[4] - j[3] for j in jobs if (j[2] or j[1]) == k and j[6] < E and j[7] < E]
         if pe and ee:
             print(f"  {k:#x}: median {med(pe):.0f} µs on P, {med(ee):.0f} µs on E ({len(ee)} jobs)")
     # barrier tails: was the longest job of a barrier on an E-core?
@@ -197,7 +199,7 @@ def main():
         prev = w[3]
         if i1 > i0:
             n += 1
-            tails += ends[i1 - 1][1][6] < 2 or ends[i1 - 1][1][7] < 2
+            tails += ends[i1 - 1][1][6] < E or ends[i1 - 1][1][7] < E
     print(f"barriers whose last-finishing job ran on an E-core: {100 * tails / max(1, n):.1f}%")
 
 

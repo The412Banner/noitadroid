@@ -8,6 +8,7 @@
 //   MINA4MAC_ICPROF=<file>          write indirect-call (site, target) counts at exit or SIGTERM (--icprof builds)
 //   MINA4MAC_JOBLOG=<file>          log the job system (worker jobs, main-thread waits), see joblog.c
 //   MINA4MAC_CPUS, MINA4MAC_QOS, MINA4MAC_YIELD   scheduling knobs, see sched.h
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +39,19 @@ static void pgo_term(int sig) {
     __llvm_profile_write_file();
     _exit(0);
 }
+#ifdef __ANDROID__
+// Android stops an app with SIGKILL: every 10 s, what was counted since the last time goes into the profile.
+void __llvm_profile_reset_counters(void);
+static void *pgo_saver(void *arg) {
+    (void)arg;
+    for (;;) {
+        sleep(10);
+        __llvm_profile_write_file();
+        __llvm_profile_reset_counters();
+    }
+    return NULL;
+}
+#endif
 #endif
 
 static void icprof_term(int sig) {  // perfbench stops the game with SIGTERM
@@ -49,6 +63,12 @@ static void icprof_term(int sig) {  // perfbench stops the game with SIGTERM
 int main(int argc, char **argv) {
 #ifdef MINA4MAC_PGO_GEN
     signal(SIGTERM, pgo_term);
+#ifdef __ANDROID__
+    {
+        pthread_t saver;
+        pthread_create(&saver, NULL, pgo_saver, NULL);
+    }
+#endif
 #endif
     const char *dir = getenv("NOITA_DIR");
     if (!dir || !*dir) dir = "build/game";

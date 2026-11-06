@@ -37,7 +37,7 @@ ASSETS = OUT / "assets"
 TOOLCHAIN = target.DEPS / "toolchain"
 DATA_WAK_SIZE = 42467033  # GOG 20250125-1640's data/data.wak: a smaller one is a copy still going on, or broken off
 
-KIT_TRACKED = ("tools/*.py", "tools/*.txt", "tools/android/build_game.py", "tools/android/device_build.py",
+KIT_TRACKED = ("tools/*.py", "tools/*.txt", "tools/*.profdata", "tools/android/build_game.py", "tools/android/device_build.py",
                "runtime/**", "third_party/khronos/**")
 KIT_GLOBS = (("third_party/luajit/src", "*.h"), (".local-deps/src/gl4es/include", "**/*.h"),
              (".local-deps/src/SDL2/include", "**/*.h"))

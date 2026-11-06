@@ -1,5 +1,5 @@
 """The game's build on the device: from the user's noita.exe and msvcp120.dll to libmain.so, as tools/build_all.py and
-tools/android/build_game.py do on a PC (no ThinLTO). The app's BuildService runs it with the app's own toolchain
+tools/android/build_game.py do on a PC. The app's BuildService runs it with the app's own toolchain
 (tools/android/build_toolchain.py); it also runs on a PC with the NDK, for testing.
 
   python tools/android/device_build.py --game <folder with noita.exe> --out <libmain.so> [--jobs N] [--lift-jobs N]
@@ -42,10 +42,13 @@ EXPECTED = {
 }
 # The app's native interface (NoitaActivity's natives, SDL's Java glue, the arguments): the app uses a libmain.so built
 # for its own ABI only. Bump it when they change, so the app asks for a new build.
-NATIVE_ABI = 3  # 2: NoitaActivity passes --game; 3: --env and nativeSetCores (the Performance page)
+# 2: NoitaActivity passes --game; 3: --env and nativeSetCores (the Performance page); 4: the boost mode, the relaunch
+NATIVE_ABI = 4
 MODULES = ("msvcp120", "noita")  # msvcp120 first: noita's register summaries use its exports'
 # Stage weights for the progress bar: seconds on a Snapdragon G3x Gen 2 (AYANEO Pocket S).
-STAGES = {"check": 2, "discover": 125, "bridges": 10, "regsum": 200, "lift": 130, "compile": 270, "link": 3}
+STAGES = {"check": 2, "discover": 125, "bridges": 10, "regsum": 200, "lift": 130, "compile": 170, "link": 340}
+# ThinLTO: on the Pocket S heavy scenes run about 20% faster with it, for about 3 minutes more of build (docs/ANDROID.zh.md).
+LTO = ["-flto=thin"]
 
 
 class Progress:
@@ -267,10 +270,11 @@ def main():
         PROGRESS.start(stage)
         build_game.OBJ.mkdir(parents=True, exist_ok=True)
         srcs = sorted(build_game.sources(), key=lambda s: -s.stat().st_size)  # the big chunks first
-        newer_than = build_game.deps_mtime(" ".join(build_game.target.cc()))
+        pgo = [f"-fprofile-use={build_game.PGO_DATA}"]
+        newer_than = build_game.deps_mtime(" ".join([*build_game.target.cc(), *LTO, *pgo]))
         done = 0
         with ThreadPoolExecutor(max(1, args.jobs)) as ex:
-            futures = [ex.submit(build_game.compile_one, (s, [], newer_than)) for s in srcs]
+            futures = [ex.submit(build_game.compile_one, (s, LTO, pgo, newer_than)) for s in srcs]
             for f in as_completed(futures):
                 f.result()
                 done += 1
@@ -282,7 +286,13 @@ def main():
         PROGRESS.start(stage)
         args.out.parent.mkdir(parents=True, exist_ok=True)
         tmp = args.out.with_name(args.out.name + ".tmp")
-        build_game.link(objs, build_all.LUAJIT_LIB, tmp, [])
+        with ThreadPoolExecutor(1) as ex:
+            linking = ex.submit(build_game.link, objs, build_all.LUAJIT_LIB, tmp, LTO, pgo, max(1, args.jobs))
+            while not linking.done():  # ThinLTO adds a file to its cache for each object it finishes
+                time.sleep(2)
+                if build_game.LTO_CACHE.exists():
+                    PROGRESS.update(min(sum(1 for _ in build_game.LTO_CACHE.iterdir()), len(objs)), len(objs))
+            linking.result()
         kit = (ROOT / "KIT_VERSION").read_text().strip() if (ROOT / "KIT_VERSION").exists() else "dev"
         info = {**{name: want for name, want in EXPECTED.items()}, "abi": NATIVE_ABI, "kit": kit, "built": int(time.time()),
                 "sha256": sha256(tmp)}

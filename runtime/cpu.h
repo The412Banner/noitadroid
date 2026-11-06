@@ -77,6 +77,15 @@ ORDERED_OPS(16, uint16_t)
 ORDERED_OPS(32, uint32_t)
 ORDERED_OPS(64, uint64_t)
 
+// Prefetches for tools/prefetch.py: the cell in a table entry, both of the cache lines it's likely to straddle.
+static inline void pf_cell(uint32_t slot) {
+    uint32_t cell = rd32(slot);
+    if (cell) {
+        __builtin_prefetch(P(cell));
+        __builtin_prefetch(P(cell + 0x30));
+    }
+}
+
 static inline int16_t sat16(int32_t v) { return v > 32767 ? 32767 : v < -32768 ? -32768 : (int16_t)v; }
 static inline uint8_t usat8(int16_t v) { return v > 255 ? 255 : v < 0 ? 0 : (uint8_t)v; }
 

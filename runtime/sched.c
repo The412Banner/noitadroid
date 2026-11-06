@@ -14,6 +14,7 @@
 #include <dirent.h>
 #include <errno.h>
 #include <limits.h>
+#include <sys/resource.h>
 #endif
 
 static uint32_t NCPU;  // 0 until sched_init (the tests don't call it): all CPUs
@@ -56,13 +57,15 @@ static const char *env(const char *name, const char *dflt) {
 //   split   as prime, but guest threads take all the other cores, the slowest too.
 //   fast    split, and Sleep(0) spins (MINA4MAC_YIELD=spin): the main thread's job waits keep its core busy, so core
 //           control doesn't pause it and its clock stays up.
+//   boost   split, and the job pool gets one more thread, on the fastest core at a low priority: it runs jobs while
+//           the main thread waits for them, which also keeps that core awake and its clock up.
 // On the Pocket S (docs/ANDROID.zh.md, "性能"), split was 16% faster than system in perfbench's jungle scene (mobs:
 // the main thread's work) and 8% in heavy (liquids: the guest threads'); fast 25% and 14%, a few degrees hotter;
 // big and prime lost in heavy (fewer guest threads). The in-game menu offers system, split and fast.
 // A thread inherits its creator's affinity, and Android resets it when the app moves between cgroups (foreground,
 // background), so a keeper thread puts each of the process's threads where the mode wants it, once a second.
-enum { CORES_SYSTEM, CORES_BIG, CORES_PRIME, CORES_SPLIT, CORES_FAST, NCORE_MODES };
-static const char *const CORE_MODES[] = {"system", "big", "prime", "split", "fast"};
+enum { CORES_SYSTEM, CORES_BIG, CORES_PRIME, CORES_SPLIT, CORES_FAST, CORES_BOOST, NCORE_MODES };
+static const char *const CORE_MODES[] = {"system", "big", "prime", "split", "fast", "boost"};
 #define MAXCPU 64
 static long CAP[MAXCPU];  // each CPU's capacity (or its top frequency), for telling the kinds of cores apart
 static int NCONF;
@@ -74,6 +77,8 @@ static pid_t MAIN_TID;
 static unsigned MAIN_FAILED;
 static pid_t GUEST_TIDS[256];
 static int NGUEST;
+static pid_t TOP_TID;  // boost: the job thread on the main thread's core, for as long as the mode is boost
+static int TOP_INDEX = -1;  // boost: which guest thread it is, by creation
 
 static long read_long(const char *path) {
     long v = -1;
@@ -134,8 +139,8 @@ static int cores_sets(int mode, cpu_set_t *main, cpu_set_t *fallback, cpu_set_t 
     for (int i = 0; i < NCONF; i++)
         if (!CPU_ISSET(i, &top)) CPU_SET(i, other);
     *main = top, *fallback = big;
-    *guest = mode == CORES_SPLIT || mode == CORES_FAST ? *other : mid;
-    return CPU_COUNT(guest) + 1;
+    *guest = mode == CORES_SPLIT || mode == CORES_FAST || mode == CORES_BOOST ? *other : mid;
+    return CPU_COUNT(guest) + 1 + (mode == CORES_BOOST);
 }
 
 static const char *set_str(const cpu_set_t *s, char *buf, size_t n) {  // "3-6,8"
@@ -166,6 +171,7 @@ static void cores_apply(void) {
     cpu_set_t m = MAIN_SET, fb = MAIN_FALLBACK, g = GUEST_SET, o = OTHER_SET;
     unsigned gen = CORES_GEN;
     int idle = CORES_MODE == CORES_SYSTEM && CORES_APPLIED == gen;
+    pid_t top = CORES_MODE == CORES_BOOST ? TOP_TID : 0;
     CORES_APPLIED = gen;
     pthread_mutex_unlock(&CORES_M);
     if (idle) return;
@@ -175,7 +181,7 @@ static void cores_apply(void) {
     while ((e = readdir(d))) {
         pid_t tid = (pid_t)atoi(e->d_name);
         if (tid <= 0) continue;
-        const cpu_set_t *want = tid == MAIN_TID ? &m : is_guest(tid) ? &g : &o;
+        const cpu_set_t *want = tid == MAIN_TID || tid == top ? &m : is_guest(tid) ? &g : &o;
         cpu_set_t have;
         if (!sched_getaffinity(tid, sizeof have, &have) && CPU_EQUAL(&have, want)) continue;
         // fails for any thread while the cgroup has none of its cores (background)
@@ -213,6 +219,7 @@ static int cores_init(void) {
     MAIN_TID = gettid();
     pthread_mutex_lock(&CORES_M);
     int n = cores_set_mode(mode_of(env("NOITADROID_CORES", "system")));
+    if (CORES_MODE == CORES_BOOST) TOP_INDEX = n - 2;  // the first pool's last: the game makes n - 1 of them first
     cpu_set_t m = MAIN_SET;
     pthread_mutex_unlock(&CORES_M);
     if (sched_setaffinity(0, sizeof m, &m)) sched_setaffinity(0, sizeof MAIN_FALLBACK, &MAIN_FALLBACK);
@@ -301,8 +308,14 @@ void sched_thread_start(void) {
     if (at >= 0) GUEST_TIDS[at] = tid, __atomic_store_n(&NGUEST, at + 1, __ATOMIC_RELEASE);
     cpu_set_t g = GUEST_SET;
     int set = CORES_MODE > CORES_SYSTEM;
+    int top = at == TOP_INDEX;
+    if (top) TOP_TID = tid;
     pthread_mutex_unlock(&CORES_M);
     if (set) sched_setaffinity(0, sizeof g, &g);
+    if (top) {  // the keeper puts it on the fastest core; it gives way to the main thread there
+        setpriority(PRIO_PROCESS, 0, atoi(env("NOITADROID_BOOST_NICE", "10")));
+        fprintf(stderr, "[noitadroid] cores boost: guest thread %d, tid %d, is on the main thread's core\n", at + 1, tid);
+    }
 #endif
 }
 
