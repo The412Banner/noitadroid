@@ -86,7 +86,7 @@ final class FrameGen implements SurfaceHolder.Callback {
         }
         if (!tmp.renameTo(copy)) throw new IOException("can't write " + copy);
         String status = nativeBuildLsfgCache(copy.getPath(), lsfgCache(c).getPath());
-        return "Ok".equals(status) ? null : status;
+        return "ok".equalsIgnoreCase(status) ? null : status;  // lsfg::statusName: "ok", else why not
     }
 
     /** In onCreate, after SDL made its layout; false when the library can't load (the game runs without it). */
