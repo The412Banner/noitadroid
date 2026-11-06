@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="setup_subtitle">Noita 安卓版：首次启动</string>
-    <string name="setup_intro">这个应用里没有 Noita 本体：它运行的是你自己的那份游戏，也就是 GOG 上的 Windows 版（版本 %1$s），重编译到了 Android 上。右边列出了它还需要什么。全部就绪后，打开应用会直接进入游戏。</string>
+    <string name="setup_intro">这个应用里没有 Noita 本体：它运行的是你自己的那份游戏，也就是 2025 年 1 月 25 日的 Windows 版（GOG 版本 %1$s 或 Steam 版），重编译到了 Android 上。右边列出了它还需要什么。全部就绪后，打开应用会直接进入游戏。</string>
     <string name="setup_ready">全部就绪。</string>
     <string name="setup_not_ready">还没准备好：请看标 ✕ 的项。</string>
     <string name="start">开始游戏</string>
@@ -22,8 +22,10 @@
 
     <string name="version_title">游戏版本</string>
     <string name="version_waiting">游戏文件就位后才能检查。</string>
-    <string name="version_wrong">%1$s 不是这个应用对应的版本。需要的是 GOG 上 Windows 版的 Noita，版本 %2$s（2025 年 1 月 25 日）。Steam 版和其他版本都不行。</string>
-    <string name="version_ok">GOG 版 %1$s，与这个应用对应。</string>
+    <string name="version_wrong">%1$s 不是这个应用支持的版本。需要的是 2025 年 1 月 25 日的 Windows 版 Noita：GOG 版本 %2$s 或 Steam 版。其他版本都不行。</string>
+    <string name="version_ok">%1$s，这个应用支持。</string>
+    <string name="game_gog">GOG 版 %1$s</string>
+    <string name="game_steam">Steam 版（2025 年 1 月 25 日）</string>
 
     <string name="sound_title">声音（FMOD）</string>
     <string name="sound_ok">此应用已包含 FMOD %1$s。</string>
@@ -160,6 +162,7 @@
     <string name="pick_no_picker">这台设备没有文件选择器。</string>
     <string name="pick_unknown">App 用不了 %1$s。请选择 GOG 的安装包（setup_noita_….exe）、游戏文件夹里的 noita.exe，或者 FMOD 的 Android 版压缩包。</string>
     <string name="pick_no_path">App 没法从那里打开 %1$s，请从存储自己的文件夹（内部存储或存储卡）里选择。</string>
+    <string name="files_wrong_installer">这里还有 GOG 的安装程序：%2$s 中的 %1$s。应用可以改用它来安装游戏。</string>
     <string name="files_installer_left">GOG 的安装包还在 %1$s（%2$s），游戏已经不需要它了。</string>
     <string name="files_installer_delete">删除安装包</string>
     <string name="installer_delete_title">删除 GOG 的安装包？</string>

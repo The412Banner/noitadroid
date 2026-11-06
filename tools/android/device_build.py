@@ -24,6 +24,7 @@ import json
 import os
 import pickle
 import selectors
+import shutil
 import signal
 import subprocess
 import sys
@@ -35,11 +36,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
 
-# The game build the recompiled code is for: GOG's 20250125-1640.
-EXPECTED = {
-    "noita.exe": "f0f5ffd1c64558663ac7cffaf689f4899732a56494c3530b806bf3357d094363",
-    "msvcp120.dll": "87c42ca155473e4e71857d03497c8cbc28fa8ff7f2c8d72e8a1f39b71078f608",
-}
+# The game builds the recompiler takes (GOG's 20250125-1640 or the Steam build of the same day) are in
+# tools/game_build.py.
 # The app's native interface (NoitaActivity's natives, SDL's Java glue, the arguments): the app uses a libmain.so built
 # for its own ABI only. Bump it when they change, so the app asks for a new build.
 # 2: NoitaActivity passes --game; 3: --env and nativeSetCores (the Performance page); 4: the boost mode, the relaunch
@@ -186,11 +184,15 @@ def main():
     stage = "check"
     try:
         PROGRESS.start(stage)
-        for name, want in EXPECTED.items():
+        import game_build  # noqa: E402
+        for name in ("noita.exe", "msvcp120.dll"):
             if not (args.game / name).exists():
                 raise RuntimeError(f"{args.game / name} is missing")
-            if sha256(args.game / name) != want:
-                raise RuntimeError(f"{name} isn't GOG's build 20250125-1640")
+        game = game_build.of(args.game)
+        if game is None:
+            raise RuntimeError("noita.exe isn't GOG's build 20250125-1640 or the Steam build of Jan 25 2025")
+        if sha256(args.game / "msvcp120.dll") != game_build.MSVCP120_SHA256:
+            raise RuntimeError("msvcp120.dll isn't the one Noita of Jan 25 2025 comes with")
         PROGRESS.finish()
 
         import build_all  # noqa: E402
@@ -201,6 +203,12 @@ def main():
         ForkPool.jobs = args.lift_jobs
         state = ROOT / "build/state"
         state.mkdir(parents=True, exist_ok=True)
+        # What was made for another noita.exe goes: the game's discovery, summaries and C (msvcp120 is the same).
+        game_file = state / "game"
+        if not game_file.exists() or game_file.read_text().strip() != game.exe_sha256:
+            shutil.rmtree(build_dir("noita"), ignore_errors=True)
+            (state / "discover-noita").unlink(missing_ok=True)
+            game_file.write_text(game.exe_sha256 + "\n")
 
         stage = "discover"
         PROGRESS.start(stage)
@@ -239,7 +247,7 @@ def main():
 
         stage = "lift"
         PROGRESS.start(stage)
-        ic = build_all._load_ic(build_all.IC_SITES, set(starts)) if build_all.IC_SITES.exists() else {}
+        ic = build_all._load_ic(build_all.IC_SITES, set(starts)) if game.speed_data and build_all.IC_SITES.exists() else {}
         jobs = []
         for m in MODULES:
             gen = build_dir(m) / "gen"
@@ -259,7 +267,7 @@ def main():
                 lifted += len(todo)
         table = ['#include "rt.h"', '#include "decls.h"',  # as tools/build_all.py writes it
                  "const FnEntry FN_TABLE[] = {" + ",".join(f"{{{a:#x}u,F_{a:08x}}}" for a in starts) + "};",
-                 f"const int FN_COUNT = {len(starts)};"]
+                 f"const int FN_COUNT = {len(starts)};", build_all.game_entry()]
         ic_fns = sorted({t for ts in ic.values() for t in ts})
         table += ["const uint32_t IC_TARGETS[] = {" + ",".join([f"{t:#x}u" for t in ic_fns] + ["0"]) + "};",
                   f"const int IC_TARGET_COUNT = {len(ic_fns)};"]
@@ -270,7 +278,7 @@ def main():
         PROGRESS.start(stage)
         build_game.OBJ.mkdir(parents=True, exist_ok=True)
         srcs = sorted(build_game.sources(), key=lambda s: -s.stat().st_size)  # the big chunks first
-        pgo = [f"-fprofile-use={build_game.PGO_DATA}"]
+        pgo = [f"-fprofile-use={build_game.PGO_DATA}"] if game.speed_data else []  # GOG's build's profile
         newer_than = build_game.deps_mtime(" ".join([*build_game.target.cc(), *LTO, *pgo]))
         done = 0
         with ThreadPoolExecutor(max(1, args.jobs)) as ex:
@@ -294,8 +302,8 @@ def main():
                     PROGRESS.update(min(sum(1 for _ in build_game.LTO_CACHE.iterdir()), len(objs)), len(objs))
             linking.result()
         kit = (ROOT / "KIT_VERSION").read_text().strip() if (ROOT / "KIT_VERSION").exists() else "dev"
-        info = {**{name: want for name, want in EXPECTED.items()}, "abi": NATIVE_ABI, "kit": kit, "built": int(time.time()),
-                "sha256": sha256(tmp)}
+        info = {"noita.exe": game.exe_sha256, "msvcp120.dll": game_build.MSVCP120_SHA256, "game": game.name, "abi": NATIVE_ABI,
+                "kit": kit, "built": int(time.time()), "sha256": sha256(tmp)}
         tmp.replace(args.out)
         args.out.with_suffix(".json").write_text(json.dumps(info, indent=1) + "\n")
         PROGRESS.finish()

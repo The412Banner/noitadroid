@@ -24,7 +24,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "io.github.zhouwuqi.noitadroid"
+        applicationId = "io.github.the412banner.noitadroid"  // the fork: installs beside the original
         minSdk = 30  // all-files access (MANAGE_EXTERNAL_STORAGE), where the game and saves live
         targetSdk = 36
         versionCode = 4

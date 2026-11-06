@@ -38,10 +38,11 @@ import slots  # noqa: E402
 from pe import MODULES, build_dir  # noqa: E402
 import gen_gl  # noqa: E402
 import gen_sdl  # noqa: E402
+import game_build  # noqa: E402
 import target  # noqa: E402
 
 GEN = ROOT / "build/gen_all"
-LAUNCHER = ("main.c", "heap.c", "proc.c", "msvcr120.c", "msvcr120_stdio.c", "msvcr120_string.c", "kernel32.c", "kernel32_file.c", "undname.c", "msvcr120_concrt.c", "sync.c", "hle.c", "msvcr120_math.c", "shlwapi.c", "shell32.c", "galaxy.c", "wininet.c", "ws2_32.c", "user32.c", "fmod.c", "fmod_stub.c", "opengl32.c", "thread.c", "sdl2_stdlib.c", "joblog.c", "sched.c")  # runtime files only the launcher links
+LAUNCHER = ("main.c", "heap.c", "proc.c", "msvcr120.c", "msvcr120_stdio.c", "msvcr120_string.c", "kernel32.c", "kernel32_file.c", "undname.c", "msvcr120_concrt.c", "sync.c", "hle.c", "msvcr120_math.c", "shlwapi.c", "shell32.c", "galaxy.c", "steam.c", "wininet.c", "ws2_32.c", "user32.c", "fmod.c", "fmod_stub.c", "opengl32.c", "thread.c", "sdl2_stdlib.c", "joblog.c", "sched.c")  # runtime files only the launcher links
 SDL = ("sdl2.c",)  # runtime files of the SDL2 bridge (launcher only; compiled with the host SDL2's flags)
 LUA = ("lua51.c",)  # the LuaJIT bridge (launcher only; compiled with LUA_CFLAGS, linked with LUAJIT_LIB)
 GLES = () if target.APPLE else ("gles.c",)  # GLES contexts for gl4es (launcher only; SDL's flags, target.gl_wrap_flags)
@@ -103,6 +104,12 @@ def regsum_for(module, with_slots=False):
                   f"none in {', '.join(f'{v:,} {k}' for k, v in sorted(why.items(), key=lambda kv: -kv[1]))}")
         regsum.save(module, s, extern, plans)
     return s, plans or {}
+
+
+def game_entry():
+    """table.c's GAME_ENTRY: the entry point of the noita.exe the code was lifted from, which runtime/main.c checks."""
+    from pe import load
+    return f"const uint32_t GAME_ENTRY = {load('noita').entry:#x}u;"
 
 
 def _load_ic(path, starts):
@@ -216,6 +223,8 @@ def main():
     # An --icprof build keeps the inline-cache branches, so its sync counts match the default build's, but every
     # branch calls guest_call_site, so the site profile is the same either way.
     ic = {} if args.ic == "none" or not ic_path.exists() else _load_ic(ic_path, set(starts))
+    if ic and ic_path == IC_SITES and not game_build.speed_data():
+        ic = {}  # recorded on GOG's build: its sites aren't this build's (tools/game_build.py)
     (GEN / "decls.h").write_text("\n".join(f"void F_{a:08x}(CPU *restrict c);" for a in starts))
     t0 = time.time()
     gen_sdl.generate()  # the bridges' HOST declarations give regsum the imports' stack pops
@@ -243,7 +252,7 @@ def main():
     t1 = time.time()
     table = ['#include "rt.h"', '#include "decls.h"',
              "const FnEntry FN_TABLE[] = {" + ",".join(f"{{{a:#x}u,F_{a:08x}}}" for a in starts) + "};",
-             f"const int FN_COUNT = {len(starts)};"]
+             f"const int FN_COUNT = {len(starts)};", game_entry()]
     ic_fns = sorted({t for ts in ic.values() for t in ts})  # rt_hook warns about these: cached sites bypass hooks
     table += ["const uint32_t IC_TARGETS[] = {" + ",".join([f"{t:#x}u" for t in ic_fns] + ["0"]) + "};",
               f"const int IC_TARGET_COUNT = {len(ic_fns)};"]

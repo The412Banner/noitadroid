@@ -24,6 +24,7 @@ import target  # noqa: E402
 import build_all  # noqa: E402
 import gen_gl  # noqa: E402
 import gen_sdl  # noqa: E402
+import game_build  # noqa: E402
 
 ROOT = target.ROOT
 OUT = ROOT / "build/android"
@@ -223,7 +224,7 @@ def main():
     ap.add_argument("--pgo", choices=("gen", "use"), help="gen: writes its profile to PGO_RAW on the device; use: PGO_DATA")
     args = ap.parse_args()
     if not os.environ.get("NOITA_DIR"):
-        sys.exit("set NOITA_DIR to the GOG install (the bridges are generated from noita.exe's imports)")
+        sys.exit("set NOITA_DIR to the game folder (the bridges are generated from noita.exe's imports)")
     for d in (GEN, OBJ, JNI):
         d.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
@@ -234,6 +235,8 @@ def main():
     if args.pgo == "use":
         if not PGO_DATA.exists():
             sys.exit(f"no {PGO_DATA}")
+        if not game_build.speed_data():
+            sys.exit(f"{PGO_DATA.name} is GOG's build's profile, not this noita.exe's")
         pgo = [f"-fprofile-use={PGO_DATA}"]
     srcs = sources()
     newer_than = deps_mtime(" ".join([*target.cc(), *lto, *pgo]))

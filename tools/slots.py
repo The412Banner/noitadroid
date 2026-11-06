@@ -43,6 +43,7 @@ from capstone import x86
 
 sys.path.insert(0, str(Path(__file__).parent))
 import regsum  # noqa: E402
+import game_build  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE_TARGETS = ROOT / "tools/icall_targets.txt"
@@ -65,7 +66,7 @@ def _s32(v):
 
 def load_site_targets(path=SITE_TARGETS):
     """{indirect call site: a target observed there} from tools/icall_targets.txt ("site target" hex lines)."""
-    if not path.exists():
+    if not path.exists() or (path == SITE_TARGETS and not game_build.speed_data()):
         return {}
     out = {}
     for line in path.read_text().splitlines():

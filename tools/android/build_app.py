@@ -29,13 +29,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import target  # noqa: E402
 import build_all  # noqa: E402
 import device_build  # noqa: E402
+import game_build  # noqa: E402
 
 ROOT = target.ROOT
 OUT = ROOT / "build/android-app"
 JNI = OUT / "jniLibs/arm64-v8a"
 ASSETS = OUT / "assets"
 TOOLCHAIN = target.DEPS / "toolchain"
-DATA_WAK_SIZE = 42467033  # GOG 20250125-1640's data/data.wak: a smaller one is a copy still going on, or broken off
+DATA_WAK_SIZE = 42467033  # data/data.wak of Noita of Jan 25 2025 (GOG and Steam): a smaller one is a copy still going on, or broken off
 
 KIT_TRACKED = ("tools/*.py", "tools/*.txt", "tools/*.profdata", "tools/android/build_game.py", "tools/android/device_build.py",
                "runtime/**", "third_party/khronos/**")
@@ -101,7 +102,10 @@ def main():
     tc = write_zip(ASSETS / "toolchain.zip",
                    {str(p.relative_to(data)): p.read_bytes() for p in data.rglob("*") if p.is_file()})
 
-    props = {f"{name}.sha256": want for name, want in device_build.EXPECTED.items()}
+    # The game builds the app takes (tools/game_build.py): their noita.exe hashes and names, in the same order.
+    props = {"noita.exe.sha256": ",".join(b.exe_sha256 for b in game_build.BUILDS),
+             "noita.exe.games": ",".join(b.name for b in game_build.BUILDS),
+             "msvcp120.dll.sha256": game_build.MSVCP120_SHA256}
     props.update({"data.wak.size": DATA_WAK_SIZE, "native": "device", "native.abi": device_build.NATIVE_ABI, "kit.version": kit,
                   "toolchain.version": tc})
     (ASSETS / "noitadroid.properties").write_text("".join(f"{k}={v}\n" for k, v in props.items()))

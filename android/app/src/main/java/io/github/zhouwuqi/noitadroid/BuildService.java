@@ -245,7 +245,9 @@ public class BuildService extends Service {
         if (status != 0) {
             throw new IOException(error[0] != null ? error[0] : getString(R.string.build_exit, status));
         }
-        if (NativeBuild.need(this, p) != NativeBuild.Need.NONE) throw new IOException(getString(R.string.build_bad));
+        if (NativeBuild.need(this, p, GameCheck.exeHash(this, game)) != NativeBuild.Need.NONE) {
+            throw new IOException(getString(R.string.build_bad));
+        }
         NativeBuild.delete(work);  // about 1 GB of generated C and objects
     }
 

@@ -60,13 +60,14 @@ final class NativeBuild {
         return new File(c.getFilesDir(), "game/libmain.json");
     }
 
-    static Need need(Context c, Properties p) {
+    /** Whether files/game/libmain.so is there and fits this app and the game's noita.exe (its sha256: exeHash). */
+    static Need need(Context c, Properties p, String exeHash) {
         File lib = gameLib(c), info = gameInfo(c);
         if (!lib.isFile() || !info.isFile()) return Need.MISSING;
         try {
             JSONObject j = new JSONObject(new String(Files.readAllBytes(info.toPath()), StandardCharsets.UTF_8));
             if (j.optInt("abi", 0) != Integer.parseInt(p.getProperty("native.abi", "0"))) return Need.OLD;
-            if (!j.optString("noita.exe").equalsIgnoreCase(p.getProperty("noita.exe.sha256", ""))) {
+            if (!j.optString("noita.exe").equalsIgnoreCase(exeHash)) {
                 return Need.OTHER_GAME;
             }
         } catch (IOException | JSONException | NumberFormatException e) {

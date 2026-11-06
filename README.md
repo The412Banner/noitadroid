@@ -6,6 +6,13 @@ recompiled to ARM64, on Android handhelds and phones. It has no emulator and no 
 
 [中文说明](README.zh-CN.md)
 
+> **This is a fork of [zhouwuqi/noitadroid](https://github.com/zhouwuqi/noitadroid)** (all the port is
+> zhouwuqi's work). It also takes **the Steam version** of Noita of Jan 25 2025, besides GOG's build
+> `20250125-1640`: put your Steam copy's game folder on the device and choose its `noita.exe`. The Steam build is
+> stubbed offline like GOG's (no achievements, no Workshop). The speed data in `tools/` was recorded on GOG's build,
+> so the Steam build is made without it for now and runs slower (`tools/game_build.py`). The app installs beside
+> the original (`io.github.the412banner.noitadroid`).
+
 ![Noita running natively on an AYANEO Pocket S Android handheld](docs/images/pocket-s.jpg)
 
 It plays on an AYANEO Pocket S (Snapdragon G3x Gen 2, Android 13):

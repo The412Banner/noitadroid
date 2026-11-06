@@ -16,10 +16,11 @@ import java.util.Properties;
 
 /**
  * What the game needs before it can start, checked the way runtime/android_main.c and runtime/main.c will use it:
- * all-files access to shared storage, the game files in /sdcard/noitadroid/Noita, the build of the game this APK
- * is for, and (when the app builds it on the device: NativeBuild) the game's native code. The APK's build script
- * writes the game build's facts into it (assets/noitadroid.properties: the sha256 of noita.exe and msvcp120.dll,
- * data.wak's size, FMOD's version).
+ * all-files access to shared storage, the game files in /sdcard/noitadroid/Noita, a build of the game this APK
+ * takes (GOG's 20250125-1640 or the Steam build of the same day: tools/game_build.py), and (when the app builds it on
+ * the device: NativeBuild) the game's native code. The APK's build script writes the game builds' facts into it
+ * (assets/noitadroid.properties: the sha256s of noita.exe with the builds' names, msvcp120.dll's, data.wak's size,
+ * FMOD's version).
  *
  * Without the game files, it looks for GOG's offline installer in the usual places (Download, the storage's top,
  * memory cards), which the app can unpack itself.
@@ -37,6 +38,8 @@ final class GameCheck {
     final List<String> missing = new ArrayList<>();
     long wakSize = -1, wakExpected = -1;
     String wrongFile, wrongHash;
+    /** noita.exe's sha256, and which of the builds it is ("gog", "steam"), once version is OK. */
+    String exeHash, game;
     final String fmodVersion;
     /** GOG's offline installer: when the game files are missing, to install from; when they're there, to delete. */
     File installer;
@@ -97,10 +100,17 @@ final class GameCheck {
             for (String name : new String[] {"noita.exe", "msvcp120.dll"}) {
                 String want = build.getProperty(name + ".sha256");
                 String have = sha256(new File(gameDir, name), cache);
-                if (want != null && !want.equalsIgnoreCase(have)) {
+                int match = want == null ? 0 : java.util.Arrays.asList(want.toLowerCase(java.util.Locale.ROOT).split(","))
+                        .indexOf(have);
+                if (match < 0) {
                     wrongFile = name;
                     wrongHash = have;
                     break;
+                }
+                if (name.equals("noita.exe")) {
+                    exeHash = have;
+                    String[] games = build.getProperty("noita.exe.games", "gog").split(",");
+                    game = match < games.length ? games[match] : "gog";
                 }
             }
             version = wrongFile == null ? State.OK : State.WRONG;
@@ -112,7 +122,7 @@ final class GameCheck {
         } else if (files != State.OK || version != State.OK) {
             nativeCode = State.WAITING;
         } else {
-            need = NativeBuild.need(context, build);
+            need = NativeBuild.need(context, build, exeHash);
             nativeCode = need == NativeBuild.Need.NONE ? State.OK : State.MISSING;
         }
     }
@@ -168,6 +178,11 @@ final class GameCheck {
             }
         }
         return best;
+    }
+
+    /** The sha256 of noita.exe in gameDir (from the cache when the file hasn't changed). */
+    static String exeHash(Context context, File gameDir) {
+        return sha256(new File(gameDir, "noita.exe"), context.getSharedPreferences("hashes", Context.MODE_PRIVATE));
     }
 
     /** noita.exe is 15 MB: its hash is kept for the file's size and time, so later starts don't read it again. */

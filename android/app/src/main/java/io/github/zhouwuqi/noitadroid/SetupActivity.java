@@ -158,12 +158,22 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
                 break;
             default:
                 files = getString(R.string.files_ok, check.gameDir.getPath());
-                if (check.installer != null && !busy) {  // unpacked: GOG's installer can go
+                if (busy) break;
+                if (check.version == GameCheck.State.WRONG && check.installer != null && check.buildsOnDevice) {
+                    // The folder is another build, but GOG's installer is there: install from it instead.
+                    File installer = check.installer;
+                    files += " " + getString(R.string.files_wrong_installer, installer.getName(), installer.getParent());
+                    filesAction = R.string.files_installer_action;
+                    onFiles = v -> confirmBuild(installer);
+                } else if (check.installer != null && "gog".equals(check.game)) {  // unpacked: GOG's installer can go
                     File installer = check.installer;
                     files += " " + getString(R.string.files_installer_left, installer.getParent(),
                             Formatter.formatFileSize(this, installer.length()));
                     filesAction = R.string.files_installer_delete;
                     onFiles = v -> confirmDelete(installer);
+                } else if (check.buildsOnDevice) {  // another folder or GOG's installer
+                    filesAction = R.string.choose_file;
+                    onFiles = v -> pickFile();
                 }
         }
         Button filesButton = row(check.files, R.string.files_title, files, filesAction, onFiles, null);
@@ -171,7 +181,8 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
 
         row(check.version, R.string.version_title, check.version == GameCheck.State.WRONG
                 ? getString(R.string.version_wrong, check.wrongFile, GameCheck.GOG_BUILD)
-                : check.version == GameCheck.State.OK ? getString(R.string.version_ok, GameCheck.GOG_BUILD)
+                : check.version == GameCheck.State.OK ? getString(R.string.version_ok, "steam".equals(check.game)
+                        ? getString(R.string.game_steam) : getString(R.string.game_gog, GameCheck.GOG_BUILD))
                 : getString(R.string.version_waiting), 0, null, null);
 
         if (check.buildsOnDevice) {

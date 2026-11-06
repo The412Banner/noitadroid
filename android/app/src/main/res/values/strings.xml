@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Noita (noitadroid)</string>
+    <string name="app_name">Noita (noitadroid fork)</string>
 
     <!-- SetupActivity: shown only when the game can't start yet -->
     <string name="setup_subtitle">Noita on Android: first start</string>
-    <string name="setup_intro">This app doesn\'t contain Noita: it runs your own copy of the game, the Windows version from GOG (build %1$s), recompiled for Android. On the right is what it still needs. Once everything is there, the app goes straight into the game.</string>
+    <string name="setup_intro">This app doesn\'t contain Noita: it runs your own copy of the game, the Windows version of Jan 25 2025 from GOG (build %1$s) or Steam, recompiled for Android. On the right is what it still needs. Once everything is there, the app goes straight into the game.</string>
     <string name="setup_ready">Everything\'s ready.</string>
     <string name="setup_not_ready">Not ready yet: see the items marked ✕.</string>
     <string name="start">Start Noita</string>
@@ -25,8 +25,10 @@
 
     <string name="version_title">Game version</string>
     <string name="version_waiting">Checked once the game files are there.</string>
-    <string name="version_wrong">%1$s isn\'t from the build this app was made for: Noita for Windows from GOG, build %2$s (Jan 25 2025). The Steam version and other builds don\'t work.</string>
-    <string name="version_ok">GOG build %1$s, the one this app was made for.</string>
+    <string name="version_wrong">%1$s isn\'t from a build this app takes: Noita for Windows of Jan 25 2025, from GOG (build %2$s) or Steam. Other builds don\'t work.</string>
+    <string name="version_ok">%1$s, one this app takes.</string>
+    <string name="game_gog">GOG build %1$s</string>
+    <string name="game_steam">Steam build of Jan 25 2025</string>
 
     <string name="sound_title">Sound (FMOD)</string>
     <string name="sound_ok">FMOD %1$s is in this app.</string>
@@ -163,6 +165,7 @@
     <string name="pick_no_picker">This device has no file picker.</string>
     <string name="pick_unknown">%1$s isn\'t something the app can use: choose GOG\'s installer (setup_noita_….exe), noita.exe in a game folder, or FMOD\'s Android download.</string>
     <string name="pick_no_path">The app can\'t open %1$s from there. Choose it in the storage\'s own folders (Internal storage, or the memory card).</string>
+    <string name="files_wrong_installer">GOG\'s installer is here too: %1$s in %2$s. The app can install the game from it instead.</string>
     <string name="files_installer_left">GOG\'s installer is still in %1$s (%2$s); the game doesn\'t need it any more.</string>
     <string name="files_installer_delete">Delete installer</string>
     <string name="installer_delete_title">Delete GOG\'s installer?</string>

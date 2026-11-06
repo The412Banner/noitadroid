@@ -58,6 +58,7 @@ them. Every LuaJIT object lives in the guest heap, so the pointers the guest see
 | `thread.c` | guest threads: `_beginthreadex`/`_endthreadex`, Wait/GetExitCode/ResumeThread on thread handles |
 | `shlwapi.c`, `shell32.c` | SHLWAPI (PathAppendW); SHELL32 known folders, directory creation and ShellExecuteA (URLs and folders go to macOS `open`), ole32 CoTaskMemFree |
 | `galaxy.c` | GOG Galaxy stubbed offline: the interface accessors return NULL, which the game checks |
+| `steam.c` | Steamworks stubbed offline for the Steam build: `SteamAPI_Init` fails, as without Steam on Windows, and the interface pointers stay NULL |
 | `wininet.c` | WININET offline: `InternetOpenA` fails (ERROR_INTERNET_NAME_NOT_RESOLVED), and so does the rest |
 | `ws2_32.c` | WS2_32 offline: `WSAStartup` fails (WSASYSNOTREADY), the rest fail with WSANOTINITIALISED |
 | `user32.c` | USER32/COMDLG32: `GetActiveWindow` is NULL, `GetOpenFileNameA` is cancelled |

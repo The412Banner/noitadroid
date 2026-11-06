@@ -22,7 +22,8 @@
 #include "rt.h"
 #include "sched.h"
 
-enum { EXE_BASE = 0x400000, EXE_ENTRY = 0xdfadb0, EXIT_RET = 0x0badf000 };
+enum { EXE_BASE = 0x400000, EXIT_RET = 0x0badf000 };
+extern const uint32_t GAME_ENTRY;  // table.c: the entry point of the noita.exe the code was lifted from
 
 // Recompiled DLLs, in load order, at their bases from tools/pe.py MODULES.
 static const struct { const char *file; uint32_t base, entry; } DLLS[] = {
@@ -88,8 +89,8 @@ int main(int argc, char **argv) {
     sched_init();
     rt_init();
     uint32_t entry = rt_map_pe(path, EXE_BASE);
-    if (entry != EXE_ENTRY) {  // the recompiled code is for one specific build of the game
-        fprintf(stderr, "%s: entry point %#x, expected %#x (a different noita.exe build?)\n", path, entry, EXE_ENTRY);
+    if (entry != GAME_ENTRY) {  // the recompiled code is for the build of the game it was made from
+        fprintf(stderr, "%s: entry point %#x, expected %#x (a different noita.exe build?)\n", path, entry, GAME_ENTRY);
         return 2;
     }
     for (int i = 0; i < NDLLS; i++) {
