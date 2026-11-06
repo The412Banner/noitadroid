@@ -198,7 +198,13 @@ HOST_CDECL(msvcr120, _cexit) { run_onexit(c); }
 HOST_CDECL(msvcr120, exit) {
     run_onexit(c);
     fflush(NULL);
+#ifdef __ANDROID__
+    // exit() would run the destructors of the libraries (FMOD, the GL driver) under their threads, which still run:
+    // "FORTIFY: pthread_mutex_lock called on a destroyed mutex". The game is done, and Android cleans up after it.
+    _Exit((int)ARG(0));
+#else
     exit((int)ARG(0));
+#endif
 }
 HOST_CDECL(msvcr120, _exit) {
     fflush(NULL);

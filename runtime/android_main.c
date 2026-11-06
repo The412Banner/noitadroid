@@ -39,15 +39,37 @@ JNIEXPORT void JNICALL Java_io_github_zhouwuqi_noitadroid_NoitaActivity_nativeSe
     if (m) sched_set_cores(m), (*env)->ReleaseStringUTFChars(env, mode, m);
 }
 
+// The game starts itself again (kernel32.c's CreateProcessW): NoitaActivity.relaunch restarts the app with this
+// command's arguments and ends this process, so it returns only if that method can't be called.
+void noitadroid_relaunch(const char *cmd) {
+    fprintf(stderr, "[noitadroid] relaunch: %s\n", cmd);
+    JNIEnv *env = SDL_AndroidGetJNIEnv();
+    jobject activity = SDL_AndroidGetActivity();
+    jmethodID m = (*env)->GetMethodID(env, (*env)->GetObjectClass(env, activity), "relaunch", "(Ljava/lang/String;)V");
+    if (m) (*env)->CallVoidMethod(env, activity, m, (*env)->NewStringUTF(env, cmd));
+    (*env)->ExceptionClear(env);
+}
+
 static FILE *LOG_FILE;
 
+static void log_line(const char *line) {
+    __android_log_write(ANDROID_LOG_INFO, "noitadroid", line);
+    if (LOG_FILE) fprintf(LOG_FILE, "%s\n", line), fflush(LOG_FILE);
+}
+
+// With read(), not a FILE: fgets would hold the FILE's lock while it waits here, and fflush(NULL), on the game's way
+// out, would wait for that lock forever.
 static void *pump(void *fd) {
-    FILE *in = fdopen((int)(intptr_t)fd, "r");
-    char line[2048];
-    while (in && fgets(line, sizeof line, in)) {
-        line[strcspn(line, "\n")] = 0;
-        __android_log_write(ANDROID_LOG_INFO, "noitadroid", line);
-        if (LOG_FILE) fprintf(LOG_FILE, "%s\n", line), fflush(LOG_FILE);
+    char buf[2048];
+    size_t n = 0;
+    for (ssize_t got; (got = read((int)(intptr_t)fd, buf + n, sizeof buf - 1 - n)) > 0;) {
+        n += got;
+        buf[n] = 0;
+        char *line = buf, *end;
+        for (; (end = strchr(line, '\n')); line = end + 1) *end = 0, log_line(line);
+        n -= line - buf;
+        memmove(buf, line, n);
+        if (n == sizeof buf - 1) buf[n] = 0, log_line(buf), n = 0;  // a longer line, in pieces
     }
     return NULL;
 }
@@ -182,7 +204,7 @@ int SDL_main(int argc, char *argv[]) {
     static int entered;
     if (entered++) {
         __android_log_write(ANDROID_LOG_WARN, "noitadroid", "SDL_main again in the same process: exiting");
-        exit(0);
+        _Exit(0);  // as msvcr120's exit
     }
     // NoitaActivity.getArguments(): "--home <dir> --game <dir> --fmod-dir <dir>", any "--env NAME=VALUE" (the
     // performance settings, e.g. NOITADROID_CORES), then the game's own. The game folder is <home>/Noita unless the
@@ -230,5 +252,6 @@ int SDL_main(int argc, char *argv[]) {
     config_fit_display();
     int r = noitadroid_main(argc, argv);
     fprintf(stderr, "[noitadroid] the game returned %d\n", r);
-    exit(r);
+    fflush(NULL);
+    _Exit(r);  // as msvcr120's exit
 }

@@ -389,11 +389,19 @@ HOST_STDCALL(kernel32, MultiByteToWideChar, 24) {
 }
 
 // CreateProcessW: the game only starts processes to relaunch itself (after shutting down GOG Galaxy) and in dev tools
-// (ImageMagick). Neither has a macOS equivalent, so it fails as if the program were missing.
+// (ImageMagick). On Android the relaunch is the app's own restart, with the command's arguments: the "Restore" after a
+// crash needs it, and all the game does after it is exit. Otherwise it fails as if the program were missing.
+#ifdef __ANDROID__
+void noitadroid_relaunch(const char *cmd);  // runtime/android_main.c
+#endif
+
 HOST_STDCALL(kernel32, CreateProcessW, 40) {
     char app[4096] = "", cmd[4096] = "";
     if (ARG(0)) utf16_to_utf8(ARG(0), app, sizeof app);
     if (ARG(1)) utf16_to_utf8(ARG(1), cmd, sizeof cmd);
+#ifdef __ANDROID__
+    if (!strcmp(app, "noita.exe")) noitadroid_relaunch(cmd);
+#endif
     fprintf(stderr, "CreateProcessW(%s, %s): not supported\n", app, cmd);
     wr32(c->fs_base + TEB_LAST_ERROR, 2);  // ERROR_FILE_NOT_FOUND
     ret_i32(c, 0);
