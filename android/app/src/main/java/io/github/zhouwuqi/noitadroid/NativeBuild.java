@@ -67,6 +67,9 @@ final class NativeBuild {
         try {
             JSONObject j = new JSONObject(new String(Files.readAllBytes(info.toPath()), StandardCharsets.UTF_8));
             if (j.optInt("abi", 0) != Integer.parseInt(p.getProperty("native.abi", "0"))) return Need.OLD;
+            // Built from another kit: the generated code (speed data, runtime) isn't this app's.
+            String kit = p.getProperty("kit.content");
+            if (kit != null && !kit.equals(j.optString("kit"))) return Need.OLD;
             if (!j.optString("noita.exe").equalsIgnoreCase(exeHash)) {
                 return Need.OTHER_GAME;
             }

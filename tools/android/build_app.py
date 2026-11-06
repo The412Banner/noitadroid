@@ -105,7 +105,10 @@ def main():
     # The game builds the app takes (tools/game_build.py): their noita.exe hashes and names, in the same order.
     props = {"noita.exe.sha256": ",".join(b.exe_sha256 for b in game_build.BUILDS),
              "noita.exe.games": ",".join(b.name for b in game_build.BUILDS),
-             "msvcp120.dll.sha256": game_build.MSVCP120_SHA256}
+             "msvcp120.dll.sha256": game_build.MSVCP120_SHA256,
+             # the kit's KIT_VERSION, which libmain.json records: code built from another kit (other speed data, another
+             # runtime) is built again (NativeBuild.need)
+             "kit.content": kit_version.hexdigest()[:16]}
     props.update({"data.wak.size": DATA_WAK_SIZE, "native": "device", "native.abi": device_build.NATIVE_ABI, "kit.version": kit,
                   "toolchain.version": tc})
     (ASSETS / "noitadroid.properties").write_text("".join(f"{k}={v}\n" for k, v in props.items()))
