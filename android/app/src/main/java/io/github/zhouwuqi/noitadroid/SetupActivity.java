@@ -131,11 +131,17 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
         String files;
         int filesAction = 0;
         View.OnClickListener onFiles = null;
+        java.util.List<CharSequence> choices = new java.util.ArrayList<>();
+        java.util.List<View.OnClickListener> onChoices = new java.util.ArrayList<>();
         switch (check.files) {
             case WAITING: files = getString(R.string.files_waiting); break;
             case WRONG: files = getString(R.string.files_incomplete, Formatter.formatFileSize(this, check.wakSize),
                     Formatter.formatFileSize(this, check.wakExpected)); break;
             case MISSING:
+                if (!busy && check.buildsOnDevice && (!check.copies.isEmpty() || check.installer != null)) {
+                    files = getString(R.string.files_found, check.gameDir.getPath()) + found(check, choices, onChoices);
+                    break;
+                }
                 if (check.installer != null && check.buildsOnDevice) {
                     File installer = check.installer;
                     files = getString(R.string.files_installer, installer.getName(), installer.getParent(),
@@ -159,7 +165,9 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
             default:
                 files = getString(R.string.files_ok, check.gameDir.getPath());
                 if (busy) break;
-                if (check.version == GameCheck.State.WRONG && check.installer != null && check.buildsOnDevice) {
+                if (check.version == GameCheck.State.WRONG && check.buildsOnDevice && !check.copies.isEmpty()) {
+                    files += " " + getString(R.string.files_found_other) + found(check, choices, onChoices);
+                } else if (check.version == GameCheck.State.WRONG && check.installer != null && check.buildsOnDevice) {
                     // The folder is another build, but GOG's installer is there: install from it instead.
                     File installer = check.installer;
                     files += " " + getString(R.string.files_wrong_installer, installer.getName(), installer.getParent());
@@ -176,7 +184,11 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
                     onFiles = v -> pickFile();
                 }
         }
-        Button filesButton = row(check.files, R.string.files_title, files, filesAction, onFiles, null);
+        if (filesAction != 0) {
+            choices.add(0, getString(filesAction));
+            onChoices.add(0, onFiles);
+        }
+        Button filesButton = row(check.files, R.string.files_title, files, choices, onChoices, null);
         if (first == null && check.files != GameCheck.State.OK) first = filesButton;  // not "delete the installer"
 
         row(check.version, R.string.version_title, check.version == GameCheck.State.WRONG
@@ -220,8 +232,18 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
             soundAction = R.string.choose_file;
             onSound = v -> pickFile();
         }
-        if (busy || importing) soundAction = 0;
-        row(check.sound, R.string.sound_title, sound, soundAction, onSound, null);
+        java.util.List<CharSequence> soundChoices = new java.util.ArrayList<>();
+        java.util.List<View.OnClickListener> onSoundChoices = new java.util.ArrayList<>();
+        if (check.buildsOnDevice && check.sound != GameCheck.State.OK && check.fmodArchive == null) {
+            soundChoices.add(getString(R.string.sound_download));
+            onSoundChoices.add(v -> downloadFmod());
+        }
+        if (soundAction != 0) {
+            soundChoices.add(getString(soundAction));
+            onSoundChoices.add(onSound);
+        }
+        if (busy || importing || downloading) soundChoices.clear();
+        row(check.sound, R.string.sound_title, sound, soundChoices, onSoundChoices, null);
 
         boolean ready = check.ready() && !busy;
         status.setText(busy ? R.string.setup_building : ready ? R.string.setup_ready : R.string.setup_not_ready);
@@ -231,6 +253,103 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
         cancel.setVisibility(busy ? View.VISIBLE : View.GONE);
         recheck.setVisibility(busy ? View.GONE : View.VISIBLE);
         (ready ? start : busy ? cancel : first != null ? first : recheck).requestFocus();
+    }
+
+    /**
+     * The copies GameCheck found, and GOG's installer, as lines for the files row and its buttons; the user picks one
+     * (or Choose file…), and the version row then says which build it is.
+     */
+    private String found(GameCheck check, java.util.List<CharSequence> choices,
+                         java.util.List<View.OnClickListener> onChoices) {
+        StringBuilder text = new StringBuilder();
+        if (check.installer != null) {
+            File installer = check.installer;
+            text.append("\n• ").append(getString(R.string.found_installer, installer.getName(), installer.getParent()));
+            choices.add(getString(R.string.use_installer));
+            onChoices.add(v -> confirmBuild(installer));
+        }
+        for (int i = 0; i < check.copies.size(); i++) {
+            File dir = check.copies.get(i);
+            boolean steam = "steam".equals(check.copyGames.get(i));
+            text.append("\n• ").append(getString(steam ? R.string.found_steam : R.string.found_gog, dir.getPath()));
+            choices.add(getString(steam ? R.string.use_steam : R.string.use_gog));
+            onChoices.add(v -> {
+                GameCheck.setGameDir(this, dir.equals(new File(GameCheck.home(), "Noita")) ? null : dir);
+                show();
+            });
+        }
+        choices.add(getString(R.string.choose_file));
+        onChoices.add(v -> pickFile());
+        return text.toString();
+    }
+
+    // --- FMOD from the fork's release (the Fmod tag): downloaded, checked, then imported as the user's own
+
+    static final String FMOD_URL =
+            "https://github.com/The412Banner/noitadroid/releases/download/Fmod/fmodstudioapi20123android.tar.gz";
+    static final String FMOD_SHA256 = "ef104cfcaac9504f360dbedabfa10c64de5a64dd5d8f027102eab5345fc16201";
+    private boolean downloading;
+
+    private void downloadFmod() {
+        downloading = true;
+        message(getString(R.string.fmod_downloading, 0), ACCENT);
+        show();
+        File dest = new File(getCacheDir(), "fmodstudioapi20123android.tar.gz");
+        new Thread(() -> {
+            String error = null;
+            try {
+                download(FMOD_URL, dest, FMOD_SHA256,
+                        pct -> runOnUiThread(() -> message(getString(R.string.fmod_downloading, pct), ACCENT)));
+            } catch (Exception e) {
+                error = e.getMessage() != null ? e.getMessage() : e.toString();
+                android.util.Log.e("noitadroid", "FMOD download", e);
+                dest.delete();
+            }
+            String failure = error;
+            runOnUiThread(() -> {
+                downloading = false;
+                if (failure != null) {
+                    message(getString(R.string.fmod_download_failed, failure), BAD);
+                    show();
+                } else {
+                    importFmod(Uri.fromFile(dest), dest.getName());
+                }
+            });
+        }, "fmod-download").start();
+    }
+
+    /** url into dest (through dest.part), checked against its sha256; progress in percent. */
+    private static void download(String url, File dest, String sha256, java.util.function.IntConsumer progress)
+            throws Exception {
+        File part = new File(dest.getPath() + ".part");
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setConnectTimeout(20000);
+        c.setReadTimeout(30000);
+        c.setInstanceFollowRedirects(true);
+        try {
+            if (c.getResponseCode() != 200) throw new java.io.IOException("HTTP " + c.getResponseCode());
+            long total = c.getContentLengthLong();
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            try (java.io.InputStream in = c.getInputStream(); java.io.OutputStream out = new java.io.FileOutputStream(part)) {
+                byte[] buf = new byte[1 << 16];
+                long done = 0;
+                int shown = -1;
+                for (int n; (n = in.read(buf)) > 0; ) {
+                    out.write(buf, 0, n);
+                    digest.update(buf, 0, n);
+                    done += n;
+                    int pct = total > 0 ? (int) (100 * done / total) : 0;
+                    if (pct != shown) progress.accept(shown = pct);
+                }
+            }
+            StringBuilder hex = new StringBuilder();
+            for (byte b : digest.digest()) hex.append(String.format("%02x", b));
+            if (!hex.toString().equals(sha256)) throw new java.io.IOException("the download isn't the expected file");
+            if (!part.renameTo(dest)) throw new java.io.IOException("can't write " + dest);
+        } finally {
+            c.disconnect();
+            part.delete();
+        }
     }
 
     // --- building
@@ -393,6 +512,10 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
                     message(getString(R.string.fmod_failed, failure), BAD);
                     show();
                 } else {
+                    if ("file".equals(uri.getScheme()) && uri.getPath() != null
+                            && uri.getPath().startsWith(getCacheDir().getPath())) {
+                        new File(uri.getPath()).delete();  // a download (downloadFmod): imported, not needed
+                    }
                     restart();
                 }
             });
@@ -493,6 +616,18 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
     /** One checked item: its state, what it is, what to do; with an action button, which it returns. */
     private Button row(GameCheck.State state, int title, String detail, int action, View.OnClickListener onAction,
                        Button first) {
+        java.util.List<CharSequence> labels = new java.util.ArrayList<>();
+        java.util.List<View.OnClickListener> handlers = new java.util.ArrayList<>();
+        if (action != 0) {
+            labels.add(getString(action));
+            handlers.add(onAction);
+        }
+        return row(state, title, detail, labels, handlers, first);
+    }
+
+    /** A row with its buttons stacked on the right (none, one or several); the first button, for the focus. */
+    private Button row(GameCheck.State state, int title, String detail, java.util.List<CharSequence> labels,
+                       java.util.List<View.OnClickListener> handlers, Button first) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(14), dp(12), dp(14), dp(12));
@@ -516,9 +651,18 @@ public class SetupActivity extends Activity implements NativeBuild.Listener {
         grow.leftMargin = dp(8);
         row.addView(texts, grow);
         Button b = null;
-        if (action != 0) {
-            b = Ui.button(this, getString(action), onAction);
-            row.addView(b, Ui.wrap(dp(12), 0, 0, 0));
+        if (!labels.isEmpty()) {
+            LinearLayout buttons = new LinearLayout(this);
+            buttons.setOrientation(LinearLayout.VERTICAL);
+            for (int i = 0; i < labels.size(); i++) {
+                Button one = Ui.button(this, labels.get(i), handlers.get(i));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT);  // as wide as the widest
+                lp.topMargin = i == 0 ? 0 : dp(6);
+                buttons.addView(one, lp);
+                if (b == null) b = one;
+            }
+            row.addView(buttons, Ui.wrap(dp(12), 0, 0, 0));
         }
         rows.addView(row, Ui.full(0, 0, 0, dp(10)));
         return first != null ? first : b;

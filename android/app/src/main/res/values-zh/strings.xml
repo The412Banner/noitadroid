@@ -162,6 +162,17 @@
     <string name="pick_no_picker">这台设备没有文件选择器。</string>
     <string name="pick_unknown">App 用不了 %1$s。请选择 GOG 的安装包（setup_noita_….exe）、游戏文件夹里的 noita.exe，或者 FMOD 的 Android 版压缩包。</string>
     <string name="pick_no_path">App 没法从那里打开 %1$s，请从存储自己的文件夹（内部存储或存储卡）里选择。</string>
+    <string name="files_found">%1$s 里还没有游戏。在这台设备上找到了：</string>
+    <string name="files_found_other">这台设备上的其他游戏副本：</string>
+    <string name="found_installer">GOG 的安装程序：%2$s 中的 %1$s</string>
+    <string name="found_steam">%1$s 中的 Steam 版</string>
+    <string name="found_gog">%1$s 中的 GOG 版</string>
+    <string name="use_installer">用 GOG 的安装程序安装</string>
+    <string name="use_steam">使用 Steam 版</string>
+    <string name="use_gog">使用 GOG 版</string>
+    <string name="sound_download">下载 FMOD</string>
+    <string name="fmod_downloading">正在下载 FMOD 2.01.23… %1$d%%</string>
+    <string name="fmod_download_failed">FMOD 下载失败：%1$s</string>
     <string name="files_wrong_installer">这里还有 GOG 的安装程序：%2$s 中的 %1$s。应用可以改用它来安装游戏。</string>
     <string name="files_installer_left">GOG 的安装包还在 %1$s（%2$s），游戏已经不需要它了。</string>
     <string name="files_installer_delete">删除安装包</string>
@@ -171,7 +182,7 @@
     <string name="installer_delete_failed">没能删除安装包。</string>
     <string name="sound_imported">FMOD %1$s，从你自己下载的压缩包导入。</string>
     <string name="sound_archive">没有 FMOD 游戏就没有声音。它的许可证不允许 App 自带，但可以导入你自己下载的：%2$s 里的 %1$s。</string>
-    <string name="sound_missing_device">没有 FMOD 游戏就没有声音，不过它是可选的。它的许可证不允许 App 自带：请在 fmod.com 注册免费账号，下载 Android 版的「FMOD Engine」2.01.x（2.01.23 在旧版本列表里），把 fmodstudioapi20123android.tar.gz 放进「下载」文件夹，再在这里导入。</string>
+    <string name="sound_missing_device">没有 FMOD 游戏就没有声音，不过它是可选的。可以在这里下载 Android 版 FMOD 2.01.23（74 MB），或者选择你自己的 fmodstudioapi201…android.tar.gz。</string>
     <string name="sound_import">导入</string>
     <string name="fmod_importing">正在从 %1$s 导入 FMOD…完成后 App 会重启。</string>
     <string name="fmod_failed">导入 FMOD 失败：%1$s</string>

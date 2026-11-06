@@ -43,6 +43,12 @@ final class GameCheck {
     final String fmodVersion;
     /** GOG's offline installer: when the game files are missing, to install from; when they're there, to delete. */
     File installer;
+    /**
+     * Other complete game folders of a build this app takes, where copies usually are (findCopies), and their
+     * builds ("gog", "steam"): when the game folder has no game, or another build, the user picks one.
+     */
+    final List<File> copies = new ArrayList<>();
+    final List<String> copyGames = new ArrayList<>();
     /** FMOD's Android download, when there's no FMOD yet and there is one. */
     File fmodArchive;
     /** When the app builds the game's code on the device: why it has to, or NONE. */
@@ -117,6 +123,7 @@ final class GameCheck {
         } else {
             version = State.WAITING;
         }
+        if (buildsOnDevice && (files == State.MISSING || version == State.WRONG)) findCopies(context, build);
         if (!buildsOnDevice) {
             nativeCode = State.OK;  // in the APK
         } else if (files != State.OK || version != State.OK) {
@@ -178,6 +185,42 @@ final class GameCheck {
             }
         }
         return best;
+    }
+
+    /**
+     * Complete game folders (noita.exe, msvcp120.dll and data/data.wak) of a build this app takes, other than the game
+     * folder, one level down where copies usually are: Download, the top of the storage, Winlator's games folder,
+     * Games, on the internal storage and on memory cards.
+     */
+    private void findCopies(Context context, Properties build) {
+        List<File> volumes = new ArrayList<>();
+        volumes.add(Environment.getExternalStorageDirectory());
+        for (File d : context.getExternalFilesDirs(null)) {  // .../<volume>/Android/data/<app>/files
+            if (d == null) continue;
+            File volume = d.getParentFile().getParentFile().getParentFile().getParentFile();
+            if (!volumes.contains(volume)) volumes.add(volume);
+        }
+        List<String> hashes = java.util.Arrays.asList(build.getProperty("noita.exe.sha256", "").toLowerCase(java.util.Locale.ROOT)
+                .split(","));
+        String[] games = build.getProperty("noita.exe.games", "gog").split(",");
+        SharedPreferences cache = context.getSharedPreferences("hashes", Context.MODE_PRIVATE);
+        for (File volume : volumes) {
+            for (File parent : new File[] {new File(volume, Environment.DIRECTORY_DOWNLOADS), volume,
+                    new File(volume, "Winlator/games"), new File(volume, "Games"), new File(volume, "noitadroid")}) {
+                File[] dirs = parent.listFiles(File::isDirectory);
+                if (dirs == null) continue;
+                for (File d : dirs) {
+                    if (d.equals(gameDir) || copies.contains(d)) continue;
+                    boolean complete = true;
+                    for (String name : REQUIRED) complete &= new File(d, name).isFile();
+                    if (!complete) continue;
+                    int match = hashes.indexOf(sha256(new File(d, "noita.exe"), cache));
+                    if (match < 0) continue;
+                    copies.add(d);
+                    copyGames.add(match < games.length ? games[match] : "gog");
+                }
+            }
+        }
     }
 
     /** The sha256 of noita.exe in gameDir (from the cache when the file hasn't changed). */

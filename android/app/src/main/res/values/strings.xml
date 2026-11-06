@@ -165,6 +165,17 @@
     <string name="pick_no_picker">This device has no file picker.</string>
     <string name="pick_unknown">%1$s isn\'t something the app can use: choose GOG\'s installer (setup_noita_….exe), noita.exe in a game folder, or FMOD\'s Android download.</string>
     <string name="pick_no_path">The app can\'t open %1$s from there. Choose it in the storage\'s own folders (Internal storage, or the memory card).</string>
+    <string name="files_found">Not in %1$s yet. Found on this device:</string>
+    <string name="files_found_other">Other copies on this device:</string>
+    <string name="found_installer">GOG\'s installer: %1$s in %2$s</string>
+    <string name="found_steam">the Steam version in %1$s</string>
+    <string name="found_gog">the GOG version in %1$s</string>
+    <string name="use_installer">Install from GOG\'s installer</string>
+    <string name="use_steam">Use the Steam version</string>
+    <string name="use_gog">Use the GOG version</string>
+    <string name="sound_download">Download FMOD</string>
+    <string name="fmod_downloading">Downloading FMOD 2.01.23… %1$d%%</string>
+    <string name="fmod_download_failed">FMOD\'s download failed: %1$s</string>
     <string name="files_wrong_installer">GOG\'s installer is here too: %1$s in %2$s. The app can install the game from it instead.</string>
     <string name="files_installer_left">GOG\'s installer is still in %1$s (%2$s); the game doesn\'t need it any more.</string>
     <string name="files_installer_delete">Delete installer</string>
@@ -174,7 +185,7 @@
     <string name="installer_delete_failed">The installer couldn\'t be deleted.</string>
     <string name="sound_imported">FMOD %1$s, imported from your own download.</string>
     <string name="sound_archive">Without FMOD the game is silent. Its license doesn\'t allow the app to include it, but you can import your own download: %1$s, in %2$s.</string>
-    <string name="sound_missing_device">Without FMOD the game is silent; it\'s optional. Its license doesn\'t allow the app to include it: download \"FMOD Engine\" 2.01.x for Android from fmod.com (a free account; 2.01.23 is among the older versions), put fmodstudioapi20123android.tar.gz in Download, and import it here.</string>
+    <string name="sound_missing_device">Without FMOD the game is silent; it\'s optional. Download FMOD 2.01.23 for Android here (74 MB), or choose your own fmodstudioapi201…android.tar.gz.</string>
     <string name="sound_import">Import</string>
     <string name="fmod_importing">Importing FMOD from %1$s… the app then restarts.</string>
     <string name="fmod_failed">FMOD\'s import failed: %1$s</string>

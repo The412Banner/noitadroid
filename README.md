@@ -13,6 +13,12 @@ recompiled to ARM64, on Android handhelds and phones. It has no emulator and no 
 > so the Steam build is made without it for now and runs slower (`tools/game_build.py`). The app installs beside
 > the original (`io.github.the412banner.noitadroid`), signed with the fork's own key (SHA-256
 > `02:9F:5A:9A:E2:0A:8C:E3:4D:70:48:DF:96:B2:AE:FD:E6:02:2B:81:C1:15:9F:5A:F3:9E:18:CC:E1:CC:68:78`).
+>
+> Its first screen lists the copies it finds on the device (GOG's installer, game folders with `noita.exe` in
+> Download, Winlator's games folder, Games or the top of the storage) and you pick one, or choose a file. The sound
+> step has **Download FMOD**: FMOD 2.01.23 for Android from this fork's
+> [Fmod release](https://github.com/The412Banner/noitadroid/releases/tag/Fmod), checked by its sha256. That's the
+> only thing the app downloads.
 
 ![Noita running natively on an AYANEO Pocket S Android handheld](docs/images/pocket-s.jpg)
 
