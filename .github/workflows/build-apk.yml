@@ -1,0 +1,80 @@
+# The APK anyone can have (tools/android/build_app.py --release), built on demand.
+#
+# The toolchain the app carries (clang/lld 21, CPython 3.14, capstone, pefile, innoextract, the NDK sysroot: no game
+# code) is taken from zhouwuqi/noitadroid's v0.3.0 APK, pinned by its sha256, instead of building LLVM here
+# (tools/android/build_toolchain.py: about an hour on 12 cores). SDL2, gl4es and LuaJIT are built as the README says.
+# The APK is signed with the fork's key (secrets KEYSTORE_B64, KEY_PASSWORD), so builds update each other.
+name: Build APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["feat/**", "fix/**"]  # a manual run needs the workflow on the default branch: until it's merged
+    paths-ignore: ["docs/**", "**.md"]
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    env:
+      UPSTREAM_APK: https://github.com/zhouwuqi/noitadroid/releases/download/v0.3.0/noitadroid-0.3.0.apk
+      UPSTREAM_APK_SHA256: 81ce7cb5132d878aa0ce230ab1fb7bea21a07319c68b2b7c3227a209f5897384
+      NDK_VERSION: 29.0.14206865
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Android SDK and NDK
+        run: |
+          sudo apt-get install -y -qq ninja-build >/dev/null
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" \
+            "ndk;$NDK_VERSION" >/dev/null
+          mkdir -p .local-deps
+          ln -sfn "$ANDROID_HOME/ndk/$NDK_VERSION" .local-deps/ndk
+          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+
+      - name: SDL2 and gl4es
+        run: tools/android/deps.sh
+
+      - name: Toolchain from the upstream APK
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/upstream.apk" "$UPSTREAM_APK"
+          echo "$UPSTREAM_APK_SHA256  $RUNNER_TEMP/upstream.apk" | sha256sum -c -
+          T=.local-deps/toolchain
+          mkdir -p "$T/jniLibs/arm64-v8a" "$T/assets/toolchain"
+          unzip -q -j "$RUNNER_TEMP/upstream.apk" 'lib/arm64-v8a/*' -x lib/arm64-v8a/libSDL2.so -d "$T/jniLibs/arm64-v8a"
+          unzip -q -p "$RUNNER_TEMP/upstream.apk" assets/toolchain.zip > "$RUNNER_TEMP/toolchain.zip"
+          unzip -q "$RUNNER_TEMP/toolchain.zip" -d "$T/assets/toolchain"
+          ls -l "$T/jniLibs/arm64-v8a"
+
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          [ -n "$KEYSTORE_B64" ] || { echo "no signing key: the APK gets the runner's debug key"; exit 0; }
+          mkdir -p .local-deps/keys
+          echo "$KEYSTORE_B64" | base64 -d > .local-deps/keys/release.jks
+          printf 'storeFile=release.jks\npassword=%s\nalias=noitadroid\n' "$KEY_PASSWORD" > .local-deps/keys/release.properties
+
+      - name: APK
+        run: |
+          uv run tools/android/build_app.py --release
+          apk=$(ls build/android-app/noitadroid-*.apk)
+          out="build/android-app/noitadroid-fork-${GITHUB_SHA::8}.apk"
+          mv "$apk" "$out"
+          sha256sum "$out"
+          unzip -p "$out" assets/noitadroid.properties
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: noitadroid-fork-${{ github.sha }}
+          path: build/android-app/noitadroid-fork-*.apk
+          if-no-files-found: error
