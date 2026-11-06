@@ -22,7 +22,7 @@ final class Perf {
     /**
      * Android places the threads; the main thread gets the fastest core and the simulation threads the others; that,
      * and one more simulation thread uses the fastest core while the main thread waits. Measured on the Pocket S
-     * (docs/ANDROID.zh.md): split 8-16% faster than system, boost 8-13% faster than split.
+     * (docs/ANDROID.md): split 8-16% faster than system, boost 8-13% faster than split.
      */
     static final String SYSTEM = "system", SPLIT = "split", BOOST = "boost";
     static final String DEFAULT_CORES = BOOST;

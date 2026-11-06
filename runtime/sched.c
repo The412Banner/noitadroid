@@ -59,7 +59,7 @@ static const char *env(const char *name, const char *dflt) {
 //           control doesn't pause it and its clock stays up.
 //   boost   split, and the job pool gets one more thread, on the fastest core at a low priority: it runs jobs while
 //           the main thread waits for them, which also keeps that core awake and its clock up.
-// On the Pocket S (docs/ANDROID.zh.md, "性能"), split was 16% faster than system in perfbench's jungle scene (mobs:
+// On the Pocket S (docs/ANDROID.md, "Performance"), split was 16% faster than system in perfbench's jungle scene (mobs:
 // the main thread's work) and 8% in heavy (liquids: the guest threads'); fast 25% and 14%, a few degrees hotter;
 // big and prime lost in heavy (fewer guest threads). The in-game menu offers system, split and fast.
 // A thread inherits its creator's affinity, and Android resets it when the app moves between cgroups (foreground,
@@ -334,8 +334,8 @@ void sched_sleep0(void) {
 // Frame-time hints (Android 13 and later, NOITADROID_HINT=1): a performance hint session (ADPF) for the main and
 // guest threads, with a 16.7 ms target, told each frame's work: the main thread's time from one swap's return to the
 // next swap (MINA4MAC_FRAMELOG's work_ms). When frames run long the system should raise those threads' clocks, rather
-// than let them drop while the main thread naps in its job waits. On the Pocket S it changed nothing (docs/ANDROID.zh.md,
-// "性能"), so it's off unless asked for; other devices' power HALs may do more with it.
+// than let them drop while the main thread naps in its job waits. On the Pocket S it changed nothing (docs/ANDROID.md,
+// "Performance"), so it's off unless asked for; other devices' power HALs may do more with it.
 #ifdef __ANDROID__
 #include <dlfcn.h>
 static struct {

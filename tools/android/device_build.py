@@ -45,7 +45,7 @@ NATIVE_ABI = 4
 MODULES = ("msvcp120", "noita")  # msvcp120 first: noita's register summaries use its exports'
 # Stage weights for the progress bar: seconds on a Snapdragon G3x Gen 2 (AYANEO Pocket S).
 STAGES = {"check": 2, "discover": 125, "bridges": 10, "regsum": 200, "lift": 130, "compile": 170, "link": 340}
-# ThinLTO: on the Pocket S heavy scenes run about 20% faster with it, for about 3 minutes more of build (docs/ANDROID.zh.md).
+# ThinLTO: on the Pocket S heavy scenes run about 20% faster with it, for about 3 minutes more of build (docs/ANDROID.md).
 LTO = ["-flto=thin"]
 
 

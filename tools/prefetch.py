@@ -7,7 +7,7 @@ that's mapped: the tables are on the game's heap, which has no holes (runtime/he
 unrelated word, which a prefetch ignores.
 
 runtime/cpu.h's pf_cell(slot) fetches the cache lines of the cell in that table entry. A table's rows are 512 entries,
-2048 bytes. Measurements are in docs/ANDROID.zh.md, "性能".
+2048 bytes. Measurements are in docs/ANDROID.md, "Performance".
 """
 
 ROW = 2048

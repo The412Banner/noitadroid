@@ -3,7 +3,7 @@
 NOITADROID_TARGET picks it:
   mac      upstream mina4mac: Apple clang, ld64, the OpenGL framework, Homebrew's SDL2
   linux    the host's clang and lld, Mesa's libGL, the distribution's SDL2 (development and testing)
-  android  the NDK's clang for arm64 (see docs/ANDROID.zh.md)
+  android  the NDK's clang for arm64 (see docs/ANDROID.md)
 Default: mac on macOS, linux elsewhere.
 
 On the device itself (tools/android/device_build.py, run by the app) NOITADROID_TOOLCHAIN names the app's native

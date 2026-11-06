@@ -194,7 +194,7 @@ uv run tools/android/build_game.py            # build/android/noitadroid.apk: do
 ```
 
 More:
-- [docs/ANDROID.zh.md](docs/ANDROID.zh.md) has the port's notes: its design, the build on the device, and device
+- [docs/ANDROID.md](docs/ANDROID.md) (Chinese: [docs/ANDROID.zh.md](docs/ANDROID.zh.md)) has the port's notes: its design, the build on the device, and device
   testing (in Chinese).
 - [docs/README.mina4mac.md](docs/README.mina4mac.md) is mina4mac's README, for the recompiler and the macOS build.
 - The runtime's tests run on the device too: `tools/android/build_tests.sh`, then `tools/android/device_check.sh`.
