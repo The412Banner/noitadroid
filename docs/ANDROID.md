@@ -6,7 +6,7 @@ Based on [mina4mac](https://github.com/paulstraw/mina4mac) (remote `upstream`; t
 
 - Bring your own game files, for personal use only. **Don't commit** any game files, `data.wak`, generated C code or FMOD libraries. `build/` and `.local-deps/` are both in gitignore.
 - The APK you build contains code converted from the game, so build it only on your own machine and install it only on your own device. Don't distribute it.
-- Supported: GOG build `20250125-1640` (`setup_noita_20250125-1640_(79502).exe`) and, in this fork, the Steam build of the same day, a different binary of the same game (`tools/game_build.py`). The speed data in `tools/` is GOG's build's.
+- Supported: GOG build `20250125-1640` (`setup_noita_20250125-1640_(79502).exe`) and, in this fork, the Steam build of the same day, a different binary of the same game (`tools/game_build.py`). The speed data in `tools/` was recorded on GOG's build; `tools/map_build.py` maps it onto the Steam build's addresses (`tools/*_steam.*`).
 - Change upstream files as little as possible. Platform differences all go in new files, so upstream updates merge easily.
 
 ## Architecture (Android)

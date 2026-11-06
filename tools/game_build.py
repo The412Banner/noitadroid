@@ -6,7 +6,9 @@ program is the same game, but from about 0x441400 on the Steam build's code sits
 
 The speed data was recorded on GOG's build and names its addresses: the inline caches (tools/icache_sites.txt), the
 prefetches (tools/prefetch.py), the indirect call targets (tools/icall_targets.txt) and the PGO profile
-(tools/noitadroid.profdata). A build without its own (speed_data False) is built without them: the same game, slower.
+(tools/noitadroid.profdata). tools/map_build.py maps them onto another build's addresses, into files named after it
+(tools/icache_sites_steam.txt, tools/prefetch_steam.txt, ...): speed_file and prefetch give the build's own. A build
+without them is built without: the same game, slower.
 """
 import hashlib
 import os
@@ -21,14 +23,13 @@ class Build:
     label: str
     exe_sha256: str
     entry: int
-    speed_data: bool
 
 
 BUILDS = (
-    Build("gog", "GOG build 20250125-1640", "f0f5ffd1c64558663ac7cffaf689f4899732a56494c3530b806bf3357d094363", 0xdfadb0, True),
-    Build("steam", "Steam build of Jan 25 2025", "808d2a0ab51ea0b46e9ad2aeb3327a4b0ce3feae04f32ba26326bf585b5779bd", 0xdfd290,
-          False),
+    Build("gog", "GOG build 20250125-1640", "f0f5ffd1c64558663ac7cffaf689f4899732a56494c3530b806bf3357d094363", 0xdfadb0),
+    Build("steam", "Steam build of Jan 25 2025", "808d2a0ab51ea0b46e9ad2aeb3327a4b0ce3feae04f32ba26326bf585b5779bd", 0xdfd290),
 )
+TOOLS = Path(__file__).resolve().parent
 MSVCP120_SHA256 = "87c42ca155473e4e71857d03497c8cbc28fa8ff7f2c8d72e8a1f39b71078f608"
 
 
@@ -56,7 +57,33 @@ def current() -> Build | None:
     return of(Path(os.environ.get("NOITA_DIR") or Path(__file__).parent.parent / "build/game"))
 
 
-def speed_data() -> bool:
-    """Whether the build being made can use the speed data recorded on GOG's build."""
-    b = current()
-    return b is not None and b.speed_data
+def speed_file(name: str, build: Build | None = None) -> Path | None:
+    """The speed data file `name` as GOG's build has it (icache_sites.txt, icall_targets.txt, noitadroid.profdata) for
+    build (default: current()): GOG's own, or tools/map_build.py's <stem>_<build><suffix>. None when there's none."""
+    b = build or current()
+    if b is None:
+        return None
+    p = TOOLS / name
+    if b.name != "gog":
+        p = p.with_name(f"{p.stem}_{b.name}{p.suffix}")
+    return p if p.exists() else None
+
+
+@cache
+def _prefetch(name: str) -> dict:
+    from prefetch import PREFETCH
+    if name == "gog":
+        return PREFETCH
+    p = TOOLS / f"prefetch_{name}.txt"  # "<address> <GOG address>" lines (tools/map_build.py)
+    out = {}
+    for line in p.read_text().splitlines() if p.exists() else ():
+        w = line.split("#")[0].split()
+        if len(w) == 2 and int(w[1], 16) in PREFETCH:
+            out[int(w[0], 16)] = PREFETCH[int(w[1], 16)]
+    return out
+
+
+def prefetch(build: Build | None = None) -> dict:
+    """tools/prefetch.py's prefetches at build's addresses (default: current()): {address: C before it}."""
+    b = build or current()
+    return _prefetch(b.name) if b else {}

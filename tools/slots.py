@@ -66,7 +66,9 @@ def _s32(v):
 
 def load_site_targets(path=SITE_TARGETS):
     """{indirect call site: a target observed there} from tools/icall_targets.txt ("site target" hex lines)."""
-    if not path.exists() or (path == SITE_TARGETS and not game_build.speed_data()):
+    if path == SITE_TARGETS:  # this build's own (tools/game_build.py)
+        path = game_build.speed_file(SITE_TARGETS.name)
+    if path is None or not path.exists():
         return {}
     out = {}
     for line in path.read_text().splitlines():

@@ -247,7 +247,8 @@ def main():
 
         stage = "lift"
         PROGRESS.start(stage)
-        ic = build_all._load_ic(build_all.IC_SITES, set(starts)) if game.speed_data and build_all.IC_SITES.exists() else {}
+        ic_sites = game_build.speed_file(build_all.IC_SITES.name, game)  # this build's own (tools/game_build.py)
+        ic = build_all._load_ic(ic_sites, set(starts)) if ic_sites else {}
         jobs = []
         for m in MODULES:
             gen = build_dir(m) / "gen"
@@ -278,7 +279,8 @@ def main():
         PROGRESS.start(stage)
         build_game.OBJ.mkdir(parents=True, exist_ok=True)
         srcs = sorted(build_game.sources(), key=lambda s: -s.stat().st_size)  # the big chunks first
-        pgo = [f"-fprofile-use={build_game.PGO_DATA}"] if game.speed_data else []  # GOG's build's profile
+        profile = game_build.speed_file(build_game.PGO_DATA.name, game)  # this build's own (tools/game_build.py)
+        pgo = [f"-fprofile-use={profile}"] if profile else []
         newer_than = build_game.deps_mtime(" ".join([*build_game.target.cc(), *LTO, *pgo]))
         done = 0
         with ThreadPoolExecutor(max(1, args.jobs)) as ex:

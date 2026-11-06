@@ -223,8 +223,9 @@ def main():
     # An --icprof build keeps the inline-cache branches, so its sync counts match the default build's, but every
     # branch calls guest_call_site, so the site profile is the same either way.
     ic = {} if args.ic == "none" or not ic_path.exists() else _load_ic(ic_path, set(starts))
-    if ic and ic_path == IC_SITES and not game_build.speed_data():
-        ic = {}  # recorded on GOG's build: its sites aren't this build's (tools/game_build.py)
+    if ic_path == IC_SITES:  # the default: this build's own (tools/game_build.py)
+        own = game_build.speed_file(IC_SITES.name)
+        ic = _load_ic(own, set(starts)) if own and args.ic != "none" else {}
     (GEN / "decls.h").write_text("\n".join(f"void F_{a:08x}(CPU *restrict c);" for a in starts))
     t0 = time.time()
     gen_sdl.generate()  # the bridges' HOST declarations give regsum the imports' stack pops

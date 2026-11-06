@@ -233,11 +233,10 @@ def main():
     lto = [f"-flto={args.lto}"] if args.lto != "off" else []
     pgo = [f"-fprofile-generate={PGO_RAW}", "-DMINA4MAC_PGO_GEN"] if args.pgo == "gen" else []
     if args.pgo == "use":
-        if not PGO_DATA.exists():
-            sys.exit(f"no {PGO_DATA}")
-        if not game_build.speed_data():
-            sys.exit(f"{PGO_DATA.name} is GOG's build's profile, not this noita.exe's")
-        pgo = [f"-fprofile-use={PGO_DATA}"]
+        profile = game_build.speed_file(PGO_DATA.name)  # this build's own (tools/game_build.py)
+        if not profile:
+            sys.exit(f"no {PGO_DATA.name} for this noita.exe's build")
+        pgo = [f"-fprofile-use={profile}"]
     srcs = sources()
     newer_than = deps_mtime(" ".join([*target.cc(), *lto, *pgo]))
     t1 = time.time()

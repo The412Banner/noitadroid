@@ -4,6 +4,7 @@ Each guest function becomes `void F_<addr>(CPU *c)`. General-purpose registers, 
 it uses and flags live in C locals for the body of the function and are synced to `c` around calls
 and at exit, so clang can keep them in host registers and drop flag computations nobody reads.
 """
+import functools
 import os
 import pickle
 import re
@@ -15,8 +16,14 @@ from capstone import x86
 
 sys.path.insert(0, str(Path(__file__).parent))
 from pe import ROOT, build_dir, load  # noqa: E402
-from prefetch import PREFETCH  # noqa: E402
 import game_build  # noqa: E402
+
+
+@functools.cache
+def _prefetch():
+    """tools/prefetch.py's prefetches at this build's addresses (tools/game_build.py)."""
+    return game_build.prefetch()
+
 
 GPR = ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
 R8 = {"al": ("eax", 0), "cl": ("ecx", 0), "dl": ("edx", 0), "bl": ("ebx", 0),
@@ -980,8 +987,8 @@ class FnLifter:
                 self.emit(self.goto(prev_falls_to))
             first[a] = len(self.lines)
             self.lines.append(f"L_{a:08x}: ;  // {i.mnemonic} {i.op_str}")
-            if a in PREFETCH and game_build.speed_data():
-                self.emit(PREFETCH[a])
+            if a in (pf := _prefetch()):
+                self.emit(pf[a])
             try:
                 self.lift_insn(i)
                 if self.p.slot_mode == "check" and a == self.slot_plan.get("align", (None,))[0]:

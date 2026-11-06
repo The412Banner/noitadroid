@@ -105,8 +105,8 @@ def cache_key(module, extern):
     h.update(str((build_dir(module) / "discover.pkl").stat().st_mtime_ns).encode())
     h.update(repr(sorted((k, sorted(v[0]), v[1]) for k, v in extern.items())).encode())
     h.update(VCALL_MODE.encode())
-    targets = Path(__file__).with_name("icall_targets.txt")  # tools/slots.py's indirect call sites
-    h.update(targets.read_bytes() if targets.exists() and game_build.speed_data() else b"")
+    targets = game_build.speed_file("icall_targets.txt")  # tools/slots.py's indirect call sites, this build's own
+    h.update(targets.read_bytes() if targets else b"")
     return h.hexdigest()
 
 
