@@ -164,7 +164,15 @@
     <string name="pick_no_path">App 没法从那里打开 %1$s，请从存储自己的文件夹（内部存储或存储卡）里选择。</string>
     <string name="perf_fg">插帧</string>
     <string name="perf_fg_winfg">WinFG 2×</string>
-    <string name="perf_fg_hint">在游戏的每两帧之间生成一帧，以 120 Hz 显示：画面更流畅，延迟多一帧。游戏本身不会变快。下次启动游戏时生效。</string>
+    <string name="perf_fg_off">关闭</string>
+    <string name="perf_fg_lsfg">LSFG 2×</string>
+    <string name="perf_fg_hint">在游戏的每两帧之间生成一帧：画面更流畅，延迟多一帧，GPU 负担可能让游戏本身变慢。下次启动游戏时生效。</string>
+    <string name="perf_lsfg_none">LSFG 使用你自己的 Lossless.dll（Steam 上的 Lossless Scaling）里的着色器：还没有导入。</string>
+    <string name="perf_lsfg_ready">Lossless.dll 已导入：LSFG 可以使用。</string>
+    <string name="perf_lsfg_import">导入 Lossless.dll…</string>
+    <string name="perf_lsfg_importing">正在转换 Lossless.dll 的着色器…</string>
+    <string name="perf_lsfg_done">Lossless.dll 已导入，已选择 LSFG 2×。下次启动游戏时生效。</string>
+    <string name="perf_lsfg_failed">无法使用 Lossless.dll：%1$s</string>
     <string name="files_found">%1$s 里还没有游戏。在这台设备上找到了：</string>
     <string name="files_found_other">这台设备上的其他游戏副本：</string>
     <string name="found_installer">GOG 的安装程序：%2$s 中的 %1$s</string>

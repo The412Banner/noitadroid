@@ -167,7 +167,15 @@
     <string name="pick_no_path">The app can\'t open %1$s from there. Choose it in the storage\'s own folders (Internal storage, or the memory card).</string>
     <string name="perf_fg">Frame generation</string>
     <string name="perf_fg_winfg">WinFG 2×</string>
-    <string name="perf_fg_hint">A generated frame between each two of the game\'s, shown at 120 Hz: smoother motion, a frame more delay. The game itself doesn\'t run faster. Applies when the game starts again.</string>
+    <string name="perf_fg_off">Off</string>
+    <string name="perf_fg_lsfg">LSFG 2×</string>
+    <string name="perf_fg_hint">A generated frame between each two of the game\'s: smoother motion, a frame more delay, and GPU work that can slow the game itself. Applies when the game starts again.</string>
+    <string name="perf_lsfg_none">LSFG uses the shaders in your own Lossless.dll (Lossless Scaling on Steam): not imported yet.</string>
+    <string name="perf_lsfg_ready">Lossless.dll is imported: LSFG is ready.</string>
+    <string name="perf_lsfg_import">Import Lossless.dll…</string>
+    <string name="perf_lsfg_importing">Translating Lossless.dll\'s shaders…</string>
+    <string name="perf_lsfg_done">Lossless.dll imported: LSFG 2× is chosen. It applies when the game starts again.</string>
+    <string name="perf_lsfg_failed">Lossless.dll couldn\'t be used: %1$s</string>
     <string name="files_found">Not in %1$s yet. Found on this device:</string>
     <string name="files_found_other">Other copies on this device:</string>
     <string name="found_installer">GOG\'s installer: %1$s in %2$s</string>

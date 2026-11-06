@@ -43,19 +43,27 @@ final class Perf {
         prefs(c).edit().putString("cores", mode).apply();
     }
 
-    /** Frame generation (FrameGen, WinFG 2x): off unless chosen; it applies when the game starts. */
-    static boolean frameGen(Context c) {
-        return prefs(c).getBoolean("frameGen", false);
+    /** Frame generation (FrameGen): off, WinFG 2x or LSFG 2x; it applies when the game starts. */
+    static final String FG_OFF = "off", FG_WINFG = "winfg", FG_LSFG = "lsfg";
+
+    static String frameGen(Context c) {
+        SharedPreferences p = prefs(c);
+        if (p.contains("frameGen")) {  // the first version's on/off switch: on was WinFG
+            String was = p.getBoolean("frameGen", false) ? FG_WINFG : FG_OFF;
+            p.edit().remove("frameGen").putString("fgMode", was).apply();
+        }
+        String m = p.getString("fgMode", FG_OFF);
+        return FG_WINFG.equals(m) || FG_LSFG.equals(m) ? m : FG_OFF;
     }
 
-    static void setFrameGen(Context c, boolean on) {
-        prefs(c).edit().putBoolean("frameGen", on).apply();
+    static void setFrameGen(Context c, String mode) {
+        prefs(c).edit().putString("fgMode", mode).apply();
     }
 
     /** What the game reads at its start. */
     static List<String> env(Context c) {
         List<String> env = new ArrayList<>(Collections.singletonList("NOITADROID_CORES=" + cores(c)));
-        if (frameGen(c)) env.add("NOITADROID_FG=1");  // runtime/gles.c
+        if (!FG_OFF.equals(frameGen(c))) env.add("NOITADROID_FG=1");  // runtime/gles.c: frames to libnd_fg.so
         return env;
     }
 

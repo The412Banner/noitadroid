@@ -1,12 +1,15 @@
-// libnd_fg.so: frame generation for the game (WinFG 2x, third_party/win-fg), on the device's own Vulkan driver.
+// libnd_fg.so: frame generation for the game, 2x, on the device's own Vulkan driver: WinFG (third_party/win-fg,
+// MIT) or LSFG (third_party/lsfg, GPL-3.0: Lossless Scaling's shaders from the user's own Lossless.dll, translated
+// once into a cache by nativeBuildLsfgCache).
 //
 //   The game's thread, at each swap (runtime/gles.c calls ndfg_before_swap with the game's GLES context current):
 //     the finished frame (the window's back buffer) is blitted into one of three AHardwareBuffers, with a native
 //     fence; nothing waits. When no buffer is free (Vulkan is behind), the frame isn't copied.
 //   The frame generation thread: the newest frame is imported into Vulkan (the AHardwareBuffer as an image, the fence
-//     as a semaphore), copied into a two-frame ring (flipped: GL's rows go bottom up), and with the one before it
-//     win-fg makes the frame between them (alpha 0.35, as Bannerlator's 2x). Both are shown, generated then real,
-//     on a surface over the game's own (FrameGen.java), through a FIFO swapchain, the display asked for 120 Hz.
+//     as a semaphore), copied into a two-frame ring (flipped: GL's rows go bottom up), and the engine makes the frame
+//     between it and the one before (WinFG: alpha 0.35, as Bannerlator's 2x; LSFG: its own chain, pacer and
+//     governor). Both are shown, generated then real, on a surface over the game's own (FrameGen.java), through a
+//     FIFO swapchain, the display asked for twice the game's rate.
 //
 // The game's own swap still happens under the overlay, so the game is paced as without frame generation, and when
 // this can't run (no Vulkan extension, no surface) the game shows as usual. Log lines go to stderr, which is
@@ -35,10 +38,18 @@
 
 #include "config.hpp"
 #include "framegen.hpp"
+#include "lsfg_dll.h"
+#include "lsfg_engine.h"
+#include "lsfg_vkd.h"
+
+#include <cmath>
+#include <memory>
+#include <string>
 
 namespace {
 
 #include "dispatch_fill.inc"
+
 
 void logf(const char* fmt, ...) __attribute__((format(printf, 1, 2)));
 void logf(const char* fmt, ...) {
@@ -53,7 +64,28 @@ void logf(const char* fmt, ...) {
 
 constexpr int kSlots = 3;           // AHardwareBuffers between GL and Vulkan
 constexpr float kAlpha = 0.35f;     // where the generated frame sits between the two real ones (Bannerlator's 2x)
-constexpr float kRefresh = 120.0f;  // two presents per frame of a 60 fps game
+enum class Mode { WinFG, Lsfg };
+Mode g_mode = Mode::WinFG;
+std::string g_lsfgCache, g_tuning;  // from FrameGen.java (nativeStart)
+float g_refresh = 120.0f;           // the display's
+std::atomic<uint64_t> g_presents{0};  // every frame shown, generated ones too (the HUD's rate)
+
+// fg.conf (FrameGen.java passes its text): "key = value" lines for WinFG, to try other settings on the device.
+int tuneInt(const char* key, int dflt) {
+    std::string k = std::string(key);
+    size_t at = 0;
+    while ((at = g_tuning.find(k, at)) != std::string::npos) {
+        bool lineStart = at == 0 || g_tuning[at - 1] == '\n';
+        size_t eq = g_tuning.find('=', at);
+        size_t nl = g_tuning.find('\n', at);
+        if (lineStart && eq != std::string::npos && (nl == std::string::npos || eq < nl) &&
+            g_tuning.find_first_not_of(" \t", at + k.size()) == eq) {
+            return atoi(g_tuning.c_str() + eq + 1);
+        }
+        at += k.size();
+    }
+    return dflt;
+}
 
 // ---- shared state (g_mu) ----------------------------------------------------------------------------------------
 enum class SlotState { Free, Gl, Ready, Vk };
@@ -278,8 +310,11 @@ struct Vk {
     uint32_t ringW = 0, ringH = 0, curr = 0;
     bool havePrev = false;
     winfg::FrameGen fg;
+    std::unique_ptr<lsfg::Engine> lsfg;
     bool fgReady = false;
     uint32_t gmSlot = 0;
+    uint64_t sourceFrames = 0;
+    float presentRate = 0;  // measured, for LSFG's governor
 } vk;
 
 uint32_t memType(uint32_t bits, VkMemoryPropertyFlags want) {
@@ -306,7 +341,9 @@ bool vkInit() {
     auto createInstance = (PFN_vkCreateInstance)vk.gipa(VK_NULL_HANDLE, "vkCreateInstance");
     VkApplicationInfo app{VK_STRUCTURE_TYPE_APPLICATION_INFO};
     app.pApplicationName = "noitadroid frame generation";
-    app.apiVersion = VK_API_VERSION_1_1;
+    uint32_t loaderVersion = VK_API_VERSION_1_1;
+    if (auto ver = (PFN_vkEnumerateInstanceVersion)vk.gipa(VK_NULL_HANDLE, "vkEnumerateInstanceVersion")) ver(&loaderVersion);
+    app.apiVersion = loaderVersion >= VK_API_VERSION_1_3 ? VK_API_VERSION_1_3 : VK_API_VERSION_1_1;  // LSFG: 1.3
     const char* iext[] = {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_ANDROID_SURFACE_EXTENSION_NAME};
     VkInstanceCreateInfo ici{VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO};
     ici.pApplicationInfo = &app;
@@ -355,12 +392,33 @@ bool vkInit() {
     vk.semFd = hasExt(exts, VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
     if (vk.semFd) want.push_back(VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME);
 
+    // LSFG's shaders (SPIR-V 1.6 from DXVK's translator) need a 1.3 device with these three on.
+    VkPhysicalDeviceVulkan12Features v12{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+    VkPhysicalDeviceFeatures2 feats{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &v12};
+    auto getFeatures2 = (PFN_vkGetPhysicalDeviceFeatures2)vk.gipa(vk.inst, "vkGetPhysicalDeviceFeatures2");
+    if (props.apiVersion >= VK_API_VERSION_1_2 && app.apiVersion >= VK_API_VERSION_1_2 && getFeatures2) {
+        getFeatures2(vk.phys, &feats);
+    }
+    VkPhysicalDeviceVulkan12Features v12on{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES};
+    VkPhysicalDeviceFeatures2 featsOn{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &v12on};
+    if (g_mode == Mode::Lsfg) {
+        if (props.apiVersion < VK_API_VERSION_1_3 || app.apiVersion < VK_API_VERSION_1_3 || !v12.vulkanMemoryModel ||
+            !feats.features.shaderStorageImageWriteWithoutFormat || !feats.features.shaderStorageImageExtendedFormats) {
+            logf("off: LSFG needs Vulkan 1.3 with vulkanMemoryModel and storage images without a format");
+            return false;
+        }
+        v12on.vulkanMemoryModel = VK_TRUE;
+        v12on.vulkanMemoryModelDeviceScope = v12.vulkanMemoryModelDeviceScope;
+        featsOn.features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+        featsOn.features.shaderStorageImageExtendedFormats = VK_TRUE;
+    }
+
     float prio = 1.0f;
     VkDeviceQueueCreateInfo qci{VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO};
     qci.queueFamilyIndex = vk.qf;
     qci.queueCount = 1;
     qci.pQueuePriorities = &prio;
-    VkDeviceCreateInfo dci{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO};
+    VkDeviceCreateInfo dci{VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO, g_mode == Mode::Lsfg ? &featsOn : nullptr};
     dci.queueCreateInfoCount = 1;
     dci.pQueueCreateInfos = &qci;
     dci.enabledExtensionCount = (uint32_t)want.size();
@@ -395,14 +453,35 @@ bool vkInit() {
         vk.dd.CreateSemaphore(vk.dev, &sci, nullptr, &vk.semAcq[i]);
         vk.dd.CreateSemaphore(vk.dev, &sci, nullptr, &vk.semDone[i]);
     }
+    logf("Vulkan: %s, API %u.%u, sync fd %s", props.deviceName, VK_API_VERSION_MAJOR(props.apiVersion),
+         VK_API_VERSION_MINOR(props.apiVersion), vk.semFd ? "yes" : "no");
+    if (g_mode == Mode::Lsfg) {
+        if (!lsfgVkdInit(vk.gipa, vk.inst, gdpa, vk.dev)) { logf("off: LSFG's Vulkan entry points"); return false; }
+        lsfg::ModuleSet modules;
+        lsfg::DllStatus st = lsfg::loadModules(g_lsfgCache, modules);
+        if (st != lsfg::DllStatus::Ok) {
+            logf("off: no LSFG shader cache (%s): import Lossless.dll on the Performance page", lsfg::statusName(st));
+            return false;
+        }
+        vk.lsfg = std::make_unique<lsfg::Engine>();
+        if (!vk.lsfg->init(vk.dev, vk.phys, g_lsfgCache, lsfg::kSpirv16)) { logf("off: LSFG init failed"); return false; }
+        vk.lsfg->configure(2, 0, 1.0f, g_refresh);
+        logf("engine: LSFG 2x, display %.0f Hz", (double)g_refresh);
+        return true;
+    }
     if (!vk.fg.init(&vk.dd, &vk.id, vk.phys, vk.dev, vk.qf, vk.queue)) { logf("off: win-fg init failed"); return false; }
+    // Light by default (the 1080p balanced profile took the Pocket FIT's GPU from 12% to 99% and the game from
+    // 61 to 52 fps): flow at 1/8 resolution, no TV-L1 iterations. fg.conf can set them otherwise.
     winfg::Config cfg;
     cfg.enabled = true;
     cfg.multiplier = 2;
+    cfg.perfPreset = tuneInt("preset", 2);
+    cfg.model = tuneInt("model", 4);
+    cfg.frMode = tuneInt("fr", 2);
+    cfg.gmMode = tuneInt("gm", 0);
     cfg.sanitize();
     vk.fg.configure(cfg);
-    logf("Vulkan: %s, API %u.%u, sync fd %s", props.deviceName, VK_API_VERSION_MAJOR(props.apiVersion),
-         VK_API_VERSION_MINOR(props.apiVersion), vk.semFd ? "yes" : "no");
+    logf("engine: WinFG 2x, preset %d, model %d, fr %d, gm %d", cfg.perfPreset, cfg.model, cfg.frMode, cfg.gmMode);
     return true;
 }
 
@@ -454,14 +533,20 @@ bool prepare(uint32_t w, uint32_t h) {
         logf("off: no %ux%u images", w, h);
         return false;
     }
-    if (!vk.fg.onResize(VkExtent2D{w, h}, VK_FORMAT_R8G8B8A8_UNORM)) {
+    if (vk.lsfg) {
+        vk.lsfg->setGuestExtent(w, h);
+        if (!vk.lsfg->prepare(w, h, VK_FORMAT_R8G8B8A8_UNORM)) {
+            logf("off: LSFG prepare %ux%u failed", w, h);
+            return false;
+        }
+    } else if (!vk.fg.onResize(VkExtent2D{w, h}, VK_FORMAT_R8G8B8A8_UNORM)) {
         logf("off: win-fg onResize %ux%u failed", w, h);
         return false;
     }
     vk.ringW = w;
     vk.ringH = h;
     vk.fgReady = true;
-    logf("win-fg ready for %ux%u", w, h);
+    logf("%s ready for %ux%u", vk.lsfg ? "LSFG" : "win-fg", w, h);
     return true;
 }
 
@@ -561,7 +646,7 @@ bool makeSwapchain() {
     vk.dd.GetSwapchainImagesKHR(vk.dev, vk.swapchain, &n, nullptr);
     vk.scImages.resize(n);
     vk.dd.GetSwapchainImagesKHR(vk.dev, vk.swapchain, &n, vk.scImages.data());
-    ANativeWindow_setFrameRate(vk.window, kRefresh, ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_DEFAULT);
+    ANativeWindow_setFrameRate(vk.window, std::min(g_refresh, 120.0f), ANATIVEWINDOW_FRAME_RATE_COMPATIBILITY_DEFAULT);
     logf("swapchain %ux%u, %u images, format %d, transform %d", vk.extent.width, vk.extent.height, n, (int)fmt.format,
          (int)caps.currentTransform);
     return true;
@@ -599,7 +684,13 @@ constexpr VkPipelineStageFlags TR = VK_PIPELINE_STAGE_TRANSFER_BIT, CS = VK_PIPE
 // swapchain must be made again.
 bool showFrame(int si, Slot& s) {
     if (!importSlot(si, s) || !prepare(g_w, g_h)) return true;
-    const bool gen = vk.havePrev;
+    bool gen = vk.havePrev;
+    uint32_t lsfgGens = 0;
+    if (vk.lsfg) {  // LSFG keeps its own history; its pacer and governor say whether to generate
+        vk.lsfg->setPresentedRate(vk.presentRate);
+        lsfgGens = vk.lsfg->plan(1, ++vk.sourceFrames);
+        gen = lsfgGens > 0;
+    }
     uint32_t idx[2] = {0, 0};
     for (int k = gen ? 0 : 1; k < 2; k++) {
         VkResult r = vk.dd.AcquireNextImageKHR(vk.dev, vk.swapchain, 1000000000ull, vk.semAcq[k], VK_NULL_HANDLE, &idx[k]);
@@ -640,12 +731,21 @@ bool showFrame(int si, Slot& s) {
     blit(src, g_w, g_h, cur.img, g_w, g_h, true);
     barrier(src, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, VK_ACCESS_TRANSFER_READ_BIT, 0, TR, BOT,
             vk.qf, VK_QUEUE_FAMILY_FOREIGN_EXT);
-    barrier(cur.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+    const VkImageLayout curLayout = vk.lsfg ? VK_IMAGE_LAYOUT_GENERAL : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    barrier(cur.img, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, curLayout,
             VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT, TR, CS | TR);
-    if (gen) {
+    if (vk.lsfg) {
+        vk.lsfg->process(vk.cmd, cur.img, g_w, g_h, lsfgGens);  // every frame: it seeds the history
+        if (gen) {
+            barrier(vk.gen.img, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_SHADER_WRITE_BIT, TOP, CS);
+            vk.lsfg->generateInto(vk.cmd, 0, 0, vk.gen.img, vk.gen.view, g_w, g_h);
+        }
+    } else if (gen) {
         barrier(vk.gen.img, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, 0, VK_ACCESS_SHADER_WRITE_BIT, TOP, CS);
         vk.fg.record(vk.cmd, prev.view, cur.view, vk.gen.view, kAlpha, vk.gmSlot);
         vk.gmSlot = (vk.gmSlot + 1) % (uint32_t)winfg::FrameGen::kGmSlots;
+    }
+    if (gen) {
         barrier(vk.gen.img, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_ACCESS_SHADER_WRITE_BIT,
                 VK_ACCESS_TRANSFER_READ_BIT, CS, TR);
         VkImage a = vk.scImages[idx[0]];
@@ -654,8 +754,8 @@ bool showFrame(int si, Slot& s) {
         barrier(a, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_ACCESS_TRANSFER_WRITE_BIT, 0, TR, BOT);
     }
     VkImage b = vk.scImages[idx[1]];
-    barrier(cur.img, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-            VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_READ_BIT, CS | TR, TR);
+    barrier(cur.img, curLayout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, CS | TR, TR);
     barrier(b, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 0, VK_ACCESS_TRANSFER_WRITE_BIT, TR, TR);
     blit(cur.img, g_w, g_h, b, vk.extent.width, vk.extent.height, false);
     barrier(b, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_ACCESS_TRANSFER_WRITE_BIT, 0, TR, BOT);
@@ -696,6 +796,17 @@ bool showFrame(int si, Slot& s) {
     }
     vk.dd.WaitForFences(vk.dev, 1, &vk.fence, VK_TRUE, 1000000000ull);  // the slot can go back to GL after this
     if (gen) g_generated.fetch_add(1, std::memory_order_relaxed);
+    {
+        static auto t0 = std::chrono::steady_clock::now();
+        static uint64_t n0 = 0;
+        uint64_t n = g_presents.fetch_add(gen ? 2 : 1, std::memory_order_relaxed) + (gen ? 2 : 1);
+        double dt = std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
+        if (dt >= 0.5) {
+            vk.presentRate = (float)((n - n0) / dt);
+            n0 = n;
+            t0 = std::chrono::steady_clock::now();
+        }
+    }
     g_shown.fetch_add(1, std::memory_order_relaxed);
     vk.havePrev = true;
     vk.curr = 1 - vk.curr;
@@ -793,11 +904,50 @@ void run() {
 }  // namespace
 
 // ---- Java (FrameGen.java) --------------------------------------------------------------------------------------------
-extern "C" JNIEXPORT void JNICALL Java_io_github_zhouwuqi_noitadroid_FrameGen_nativeStart(JNIEnv*, jclass) {
+namespace {
+std::string str(JNIEnv* env, jstring s) {
+    if (!s) return {};
+    const char* c = env->GetStringUTFChars(s, nullptr);
+    std::string out(c ? c : "");
+    if (c) env->ReleaseStringUTFChars(s, c);
+    return out;
+}
+}  // namespace
+
+// mode "lsfg" or WinFG; lsfgCache: the shader cache nativeBuildLsfgCache made; refresh: the display's rate;
+// tuning: fg.conf's text (WinFG settings) or empty.
+extern "C" JNIEXPORT void JNICALL Java_io_github_zhouwuqi_noitadroid_FrameGen_nativeStart(
+        JNIEnv* env, jclass, jstring mode, jstring lsfgCache, jfloat refresh, jstring tuning) {
     std::lock_guard<std::mutex> lk(g_mu);
     if (g_started) return;
     g_started = true;
+    g_mode = str(env, mode) == "lsfg" ? Mode::Lsfg : Mode::WinFG;
+    g_lsfgCache = str(env, lsfgCache);
+    g_tuning = str(env, tuning);
+    if (refresh > 1.0f) g_refresh = refresh;
     std::thread(run).detach();
+}
+
+// Every frame shown so far, generated ones too: the HUD's rate (StatsOverlay).
+extern "C" JNIEXPORT jlong JNICALL Java_io_github_zhouwuqi_noitadroid_FrameGen_nativePresents(JNIEnv*, jclass) {
+    return (jlong)g_presents.load(std::memory_order_relaxed);
+}
+
+// Lossless.dll (the user's own, read as data) -> LSFG's 25 shaders as SPIR-V in lsfgCache. "Ok" or why not.
+extern "C" JNIEXPORT jstring JNICALL Java_io_github_zhouwuqi_noitadroid_FrameGen_nativeBuildLsfgCache(
+        JNIEnv* env, jclass, jstring dll, jstring lsfgCache) {
+    std::string d = str(env, dll), c = str(env, lsfgCache);
+    lsfg::DllStatus st = lsfg::validateDll(d);
+    if (st == lsfg::DllStatus::Ok) st = lsfg::buildCache(d, c, false);
+    logf("LSFG shader cache from %s: %s", d.c_str(), lsfg::statusName(st));
+    return env->NewStringUTF(lsfg::statusName(st));
+}
+
+// Whether the cache is there and loads (the Performance page's LSFG state).
+extern "C" JNIEXPORT jboolean JNICALL Java_io_github_zhouwuqi_noitadroid_FrameGen_nativeLsfgCacheOk(
+        JNIEnv* env, jclass, jstring lsfgCache) {
+    lsfg::ModuleSet set;
+    return lsfg::loadModules(str(env, lsfgCache), set) == lsfg::DllStatus::Ok && set.complete();
 }
 
 extern "C" JNIEXPORT void JNICALL Java_io_github_zhouwuqi_noitadroid_FrameGen_nativeSurface(JNIEnv* env, jclass,

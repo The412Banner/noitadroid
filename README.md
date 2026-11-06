@@ -19,8 +19,9 @@ recompiled to ARM64, on Android handhelds and phones. It has no emulator and no 
 > Download, Winlator's games folder, Games or the top of the storage) and you pick one, or choose a file. The sound
 > step has **Download FMOD**: FMOD 2.01.23 for Android from this fork's
 > [Fmod release](https://github.com/The412Banner/noitadroid/releases/tag/Fmod), checked by its sha256. That's the
-> only thing the app downloads. The Performance page has **frame generation** (WinFG 2×, off by default): a generated
-> frame between each two of the game's, shown at 120 Hz on its own surface (`android/fg`, `docs/ANDROID.md`).
+> only thing the app downloads. The Performance page has **frame generation**, off by default: **WinFG 2×** or
+> **LSFG 2×** (import your own `Lossless.dll` there), a generated frame between each two of the game's on its own
+> surface (`android/fg`, `docs/ANDROID.md`); the FPS display then also shows the rate on screen.
 
 ![Noita running natively on an AYANEO Pocket S Android handheld](docs/images/pocket-s.jpg)
 
@@ -218,7 +219,11 @@ More:
   [SDL2](https://libsdl.org) (zlib), [LuaJIT](https://luajit.org) (MIT) and
   [gl4es](https://github.com/ptitSeb/gl4es) (MIT).
 - **Frame generation** (this fork): [win-fg](https://github.com/The412Banner/win-fg) by The412Banner (MIT, its
-  optical flow adapted from AMD FidelityFX, MIT), in `third_party/win-fg`.
+  optical flow adapted from AMD FidelityFX, MIT), in `third_party/win-fg`; and native **LSFG** (GPL-3.0, in
+  `third_party/lsfg`): the chain ported by Camille LaVey / the Eden Emulator Project and WinNative from
+  [lsfg-vk](https://github.com/PancakeTAS/lsfg-vk) by PancakeTAS, by way of Bannerlator, with DXVK's DXBC translator
+  (zlib, Philip Rebohle and DXVK's authors). LSFG needs your own `Lossless.dll` (Lossless Scaling); nothing of it is
+  included. Because of the GPL-3.0 part, **the APK built from this fork is GPL-3.0 as a whole**.
 - **FMOD** is under FMOD's own license, and you download it yourself.
 - **noitadroid's own code**, and its icon, are MIT; see [LICENSE](LICENSE).
 

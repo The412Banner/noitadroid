@@ -298,8 +298,9 @@ Each scene was run only once. Temperatures and clocks weren't recorded (`perfben
 
 ## Frame generation (this fork)
 
-WinFG 2× ([win-fg](https://github.com/The412Banner/win-fg)'s core, MIT, in `third_party/win-fg`), on the
-Performance page, off by default. It makes no frame the game draws faster: it puts a generated frame between each
+WinFG 2× ([win-fg](https://github.com/The412Banner/win-fg)'s core, MIT, in `third_party/win-fg`) or LSFG 2× (GPL-3.0,
+`third_party/lsfg`, with the shaders of the user's own `Lossless.dll`, translated once by DXVK's DXBC translator), on
+the Performance page, off by default. It makes no frame the game draws faster: it puts a generated frame between each
 two, for smoother motion at a frame more delay. Noita's world moves one step per frame, so below 60 fps the game is
 still in slow motion; it helps most where the game holds 40–60 fps.
 
@@ -308,6 +309,13 @@ still in slow motion; it helps most where the game holds 40–60 fps.
   buffer is blitted into one of three AHardwareBuffers with a native fence. A thread imports the newest into
   Vulkan (the device's own driver), copies it into a two-frame ring (flipped), runs win-fg between it and the frame
   before (alpha 0.35), and presents the generated and the real frame through a FIFO swapchain, asking for 120 Hz.
+- WinFG runs light by default (flow at 1/8 resolution, no TV-L1): on the Pocket FIT its balanced profile at 1080p took
+  the GPU from 12% to 99% and the game from 61 to 52 fps. `/sdcard/noitadroid/fg.conf` (`preset`, `model`, `fr`,
+  `gm` = win-fg's values) sets it otherwise, for trying on the device.
+- LSFG: `plan` (its pacer and governor: it generates only when that raises what's shown without dragging the game
+  down), `process` (every frame), `generateInto`; the device is made with Vulkan 1.3's memory model and storage
+  images without a format, as its SPIR-V 1.6 needs. `FrameGen.importLsfg` copies the user's `Lossless.dll` into
+  the app and builds `files/lsfg/lsfg.cache`.
 - `FrameGen.java`: the surface it presents to, a media overlay over SDL's surface and under the window (the touch
   controls and the menu stay on top; touches go to SDL's view). The game's own swap still happens under it, so the
   game is paced as without frame generation, and when Vulkan can't do it the game shows as usual.

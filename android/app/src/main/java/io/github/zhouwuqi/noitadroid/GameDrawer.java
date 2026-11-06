@@ -50,7 +50,7 @@ final class GameDrawer {
         void setCores(String mode);
     }
 
-    static final int REQ_EXPORT = 7101, REQ_IMPORT = 7102;
+    static final int REQ_EXPORT = 7101, REQ_IMPORT = 7102, REQ_LSFG = 7103;
     private static final int MAIN = 0, PAD = 1, PAD_TARGET = 2, IMPORT = 3, PERF = 4, TOUCH = 5;
 
     private final Activity a;
@@ -71,6 +71,9 @@ final class GameDrawer {
     private float downX;
     private int page = MAIN, padSource;
     private CharSequence saveMessage;
+    /** The Performance page's line about Lossless.dll's import, while it runs and after. */
+    private CharSequence lsfgMessage;
+    private int lsfgColor;
     private int saveColor = DIM;
     private SaveTransfer.Staged staged;
 
@@ -331,17 +334,33 @@ final class GameDrawer {
             content.addView(Ui.text(a, t.getString(R.string.perf_applies), 13, TEXT, false), Ui.full(0, dp(14), 0, 0));
         }
         section(R.string.perf_fg);
-        boolean fg = Perf.frameGen(a);
-        Button fgButton = button(t.getString(R.string.perf_fg_winfg) + (fg ? "   ✓" : ""), v -> {
-            Perf.setFrameGen(a, !Perf.frameGen(a));
-            render();
-            View again = content.findViewWithTag("frameGen");
-            if (again != null) again.requestFocus();
-        });
-        if (fg) fgButton.setTextColor(ACCENT);
-        fgButton.setTag("frameGen");
-        content.addView(fgButton, Ui.full(0, dp(10), 0, 0));
+        String fg = Perf.frameGen(a);
+        boolean lsfgReady = FrameGen.lsfgReady(a);
+        String[] modes = {Perf.FG_OFF, Perf.FG_WINFG, Perf.FG_LSFG};
+        int[] labels = {R.string.perf_fg_off, R.string.perf_fg_winfg, R.string.perf_fg_lsfg};
+        for (int i = 0; i < modes.length; i++) {
+            String mode = modes[i];
+            boolean on = mode.equals(fg);
+            Button b = button(t.getString(labels[i]) + (on ? "   ✓" : ""), v -> {
+                if (Perf.FG_LSFG.equals(mode) && !FrameGen.lsfgReady(a)) {
+                    pickLsfg();  // LSFG needs the user's Lossless.dll first
+                    return;
+                }
+                Perf.setFrameGen(a, mode);
+                render();
+                View again = content.findViewWithTag("fg-" + mode);
+                if (again != null) again.requestFocus();
+            });
+            if (on) b.setTextColor(ACCENT);
+            b.setTag("fg-" + mode);
+            content.addView(b, Ui.full(0, dp(10), 0, 0));
+        }
         hint(t.getString(R.string.perf_fg_hint));
+        hint(t.getString(lsfgReady ? R.string.perf_lsfg_ready : R.string.perf_lsfg_none));
+        if (lsfgMessage != null) content.addView(Ui.text(a, lsfgMessage, 13, lsfgColor, false), Ui.full(0, dp(6), 0, 0));
+        Button imp = button(R.string.perf_lsfg_import, v -> pickLsfg());
+        imp.setEnabled(!busy);
+        content.addView(imp, Ui.full(0, dp(10), 0, 0));
         buttons(button(R.string.menu_back, v -> show(MAIN)));
     }
 
@@ -548,8 +567,49 @@ final class GameDrawer {
         host.pick(i, REQ_IMPORT);
     }
 
+    private void pickLsfg() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType("*/*");
+        host.pick(i, REQ_LSFG);
+    }
+
+    /** Lossless.dll from the picker: copied into the app and its shaders translated (FrameGen.importLsfg). */
+    private void importLsfg(Uri uri) {
+        busy = true;
+        lsfgMessage(t.getString(R.string.perf_lsfg_importing), DIM);
+        new Thread(() -> {
+            String error;
+            try (InputStream in = a.getContentResolver().openInputStream(uri)) {
+                error = in == null ? "?" : FrameGen.importLsfg(a, in);
+            } catch (Exception e) {
+                error = e.getMessage() != null ? e.getMessage() : e.toString();
+            }
+            String why = error;
+            a.runOnUiThread(() -> {
+                busy = false;
+                if (why == null) Perf.setFrameGen(a, Perf.FG_LSFG);
+                lsfgMessage(why == null ? t.getString(R.string.perf_lsfg_done) : t.getString(R.string.perf_lsfg_failed, why),
+                        why == null ? GOOD : BAD);
+            });
+        }, "noitadroid-lsfg").start();
+    }
+
+    private void lsfgMessage(CharSequence text, int color) {
+        lsfgMessage = text;
+        lsfgColor = color;
+        if (shown && page == PERF) {
+            render();
+            View again = content.findViewWithTag("fg-" + Perf.FG_LSFG);
+            if (again != null) again.requestFocus();
+        }
+    }
+
     /** The file pickers' answers; true when it was one of the menu's. */
     boolean onResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQ_LSFG) {
+            Uri uri = resultCode == Activity.RESULT_OK && data != null ? data.getData() : null;
+            if (uri != null) importLsfg(uri);
+            return true;
+        }
         if (requestCode != REQ_EXPORT && requestCode != REQ_IMPORT) return false;
         Uri uri = resultCode == Activity.RESULT_OK && data != null ? data.getData() : null;
         if (uri == null) return true;

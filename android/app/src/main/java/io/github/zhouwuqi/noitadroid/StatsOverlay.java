@@ -26,14 +26,20 @@ final class StatsOverlay {
     private final TextView view;
     private final SharedPreferences prefs;
     private final LongSupplier frames;
+    /** With frame generation: every frame shown, generated ones too (FrameGen.nativePresents), and its name. */
+    private final LongSupplier shown;
+    private final String fgName;
+    private long lastShown = -1;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final List<File> cpu = new ArrayList<>(), gpu = new ArrayList<>();
     private File battery;
     private long lastFrames = -1, lastTime;
     private final Runnable tick = this::tick;
 
-    StatsOverlay(Context c, FrameLayout parent, LongSupplier frames) {
+    StatsOverlay(Context c, FrameLayout parent, LongSupplier frames, LongSupplier shown, String fgName) {
         this.frames = frames;
+        this.shown = shown;
+        this.fgName = fgName;
         prefs = c.getSharedPreferences("overlay", Context.MODE_PRIVATE);
         view = Ui.text(c, "", 13, Ui.TEXT, true);
         view.setPadding(Ui.dp(c, 10), Ui.dp(c, 3), Ui.dp(c, 10), Ui.dp(c, 3));
@@ -78,12 +84,16 @@ final class StatsOverlay {
     }
 
     private void tick() {
-        long now = SystemClock.elapsedRealtime(), f = frames.getAsLong();
+        long now = SystemClock.elapsedRealtime(), f = frames.getAsLong(), s = shown != null ? shown.getAsLong() : -1;
         StringBuilder sb = new StringBuilder();
         if (lastFrames >= 0 && now > lastTime) {  // over the second since the last tick
             sb.append(Math.round((f - lastFrames) * 1000.0 / (now - lastTime))).append(" FPS");
+            if (shown != null && lastShown >= 0) {  // what reaches the screen, generated frames included
+                sb.append(" · ").append(fgName).append(' ').append(Math.round((s - lastShown) * 1000.0 / (now - lastTime)));
+            }
         }
         lastFrames = f;
+        lastShown = s;
         lastTime = now;
         appendTemp(sb, "CPU", hottest(cpu));
         appendTemp(sb, "GPU", hottest(gpu));

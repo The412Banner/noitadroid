@@ -57,7 +57,8 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
         }
         super.onCreate(savedInstanceState);
         if (mBrokenLibraries || mLayout == null) return;  // SDL shows its error instead of the game
-        if (Perf.frameGen(this)) FrameGen.attach(this, mLayout);  // under SDL's view, over its surface
+        String fg = Perf.frameGen(this);
+        boolean fgOn = !Perf.FG_OFF.equals(fg) && FrameGen.attach(this, mLayout, fg);  // under SDL's view, over its surface
 
         FrameLayout overlays = new FrameLayout(this);  // over the game's surface; lets touches through
         mLayout.addView(overlays, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -67,7 +68,8 @@ public class NoitaActivity extends SDLActivity implements GameDrawer.Host {
         touch = new TouchOverlay(this, controls);
         overlays.addView(touch, new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
-        StatsOverlay stats = new StatsOverlay(this, overlays, NoitaActivity::nativeFrames);
+        StatsOverlay stats = new StatsOverlay(this, overlays, NoitaActivity::nativeFrames,
+                fgOn ? FrameGen::nativePresents : null, Perf.FG_LSFG.equals(fg) ? "LSFG" : "WinFG");
         drawer = new GameDrawer(this, overlays, this, pad, stats, controls, touch);
         // Gesture navigation's back swipe starts at the same edge: keep it off the middle of the left edge (Android
         // grants an app at most 200 dp of each edge), so a swipe there opens the menu.
